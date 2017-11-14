@@ -18,5 +18,8 @@
   "homepage": "https://github.com/KAIT-HEMS/node-picogw-plugin-echonet#readme",
   "dependencies": {
     "echonet-lite": "0.0.20"
+  },
+  "picogw": {
+    "role": ["api"]
   }
 }

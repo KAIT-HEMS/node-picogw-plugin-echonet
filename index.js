@@ -56,6 +56,13 @@ value: {
 }
 */
 
+
+module.exports = {
+    init: init,
+    callproc: onProcCall,
+}
+
+
 function expandDeviceIdFromPossiblyRegExpDeviceId(device_id_with_regexp){
 	var re = [] ;
 	var regexp = new RegExp(device_id_with_regexp) ;
@@ -93,7 +100,7 @@ let ELDB = {} ;
 
 const IP_UNDEFINED = '-' ;
 
-exports.init = function(pi /*,globals*/){
+async function init(pi /*,globals*/){
 	pluginInterface = pi ;
 	log = pluginInterface.log ;
 
@@ -399,10 +406,6 @@ exports.init = function(pi /*,globals*/){
 		else setInterval(()=>{EL.search();},DEVICE_MULTICAST_INTERVAL) ;
 	}
 	searcher() ;
-
-	// Plugin must return (possibly in promise) procedure call callback function.
-	// The signature is ( method , devid , propertyname , argument )
-	return onProcCall ;
 } ;
 
 var procCallWaitList = {} ;

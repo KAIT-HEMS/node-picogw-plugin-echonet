@@ -20,6 +20,6 @@
     "echonet-lite": "0.0.20"
   },
   "picogw": {
-    "role": ["api"]
+    "role": ["server"]
   }
 }

@@ -56,13 +56,6 @@ value: {
 }
 */
 
-
-module.exports = {
-    init: init,
-    callproc: onProcCall,
-}
-
-
 function expandDeviceIdFromPossiblyRegExpDeviceId(device_id_with_regexp){
 	var re = [] ;
 	var regexp = new RegExp(device_id_with_regexp) ;
@@ -100,6 +93,7 @@ let ELDB = {} ;
 
 const IP_UNDEFINED = '-' ;
 
+module.exports.init = init;
 async function init(pi /*,globals*/){
 	pluginInterface = pi ;
 	log = pluginInterface.log ;
@@ -107,6 +101,9 @@ async function init(pi /*,globals*/){
 	localStorage = pluginInterface.localStorage ;
 	macs = localStorage.getItem('macs',{}) ;
 	//MAKER_CODE = localStorage.getItem('makercode',MAKER_CODE) ;
+
+    // register onCall function
+    pi.server.onCall = onProcCall;
 
 	// Reset states
 	for( const mac in macs ){

@@ -102,9 +102,6 @@ async function init(pi /*,globals*/){
 	macs = localStorage.getItem('macs',{}) ;
 	//MAKER_CODE = localStorage.getItem('makercode',MAKER_CODE) ;
 
-    // register onCall function
-    pi.server.onCall = onProcCall;
-
 	// Reset states
 	for( const mac in macs ){
 		macs[mac].active = false ;
@@ -575,6 +572,7 @@ function sendFrame( ip, tid, seoj, deoj, esv, properties ){
 ///
 
 
+module.exports.onCall = onProcCall;
 function onProcCall( method , path /*_devid , propname*/ , args ){
 	let path_split = path.split('/') ;
 	const _devid = path_split.shift() ;

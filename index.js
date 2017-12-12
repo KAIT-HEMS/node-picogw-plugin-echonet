@@ -1,830 +1,937 @@
-const GET_TIMEOUT = 60 * 1000 ;
-const MY_EOJ = [0x05,0xff,0x01] ;
-const LOCALE = 'EN' ;
+// TODO:remove this eslint rule later
+/* eslint-disable require-jsdoc */
+
+const GET_TIMEOUT = 60 * 1000;
+const MY_EOJ = [0x05, 0xff, 0x01];
+const LOCALE = 'EN';
 
 // first DEVICE_MULTICAST_INTITIAL_NUMBER accesses are done in every
 // DEVICE_MULTICAST_INITIAL_INTERVAL ms. Then the frequency becomes
 // DEVICE_MULTICAST_INTERVAL ms.
-var DEVICE_MULTICAST_INTITIAL_NUMBER = 4 ;
-const DEVICE_MULTICAST_INITIAL_INTERVAL = 15*1000 ;
-const DEVICE_MULTICAST_INTERVAL = 60*1000 ;
+let DEVICE_MULTICAST_INTITIAL_NUMBER = 4;
+const DEVICE_MULTICAST_INITIAL_INTERVAL = 15*1000;
+const DEVICE_MULTICAST_INTERVAL = 60*1000;
 
-var VERSION = 'v1';
+let VERSION = 'v1';
 
-/*// If you add 'makercode' entry to localstorage.json (as a number), the number is
+/* // If you add 'makercode' entry to localstorage.json (as a number), the number is
 // loaded to this MAKER_CODE variable.
 var MAKER_CODE = 0 ;*/
 
-var fs = require('fs');
-var EL = require('echonet-lite');
-var ProcConverter = require( './proc_converter.js') ;
+const fs = require('fs');
+const pathm = require('path');
+const EL = require('echonet-lite');
+const ProcConverter = require('./proc_converter.js');
 
 
-var pluginInterface ;
-var log = console.log ;
-var localStorage ;
+let pluginInterface;
+let log = console.log;
+let localStorage;
 
-var macs = {} ;
-var mynet ;
-function savemac(){ localStorage.setItem('macs',macs) ; }
+let macs = {};
+let mynet;
+function savemac() {
+    localStorage.setItem('macs', macs);
+}
 
 /* macs entry format:
 key:macaddress
 value: {
-	ip : LAST_AVAILABLE_IP_ADDRESS
-	, active:true (at least one message is received since last boot.)|false (otherwise)
-	, nodeprofile : {
-		 version: VERSION(0x82) , id: ID(0x83) ,date: PRODUCTION_DATE(0x8e / optional))
-	}
-	, devices :{
-		DEVICE_ID (etc. DomesticHomeAirConditioner_1) : {
-			  eoj : object identifier (eg. 0x013001)
-			, active :  true (the device is registered to the controller)
-						| false (the user deleted this device)
-						| null (the device is not registered yet)
-			, location : 0x81
-			, error : 0x88
-			, date : PRODUCTION_DATE (0x8e / optional)
-			, worktime : cumulated working time (0x9a / optional)
-			, propertymap : [] array of available properties
-			, options : {} device specific information extracted from devices DB
-		},
-	}
-	, eoj_id_map : {	// EOJ (eg.013001) to DEVICE_ID (eg. DomesticHomeAirConditioner_1) mapping
-		EOJ: DEVICE_ID,
-	}
+    ip : LAST_AVAILABLE_IP_ADDRESS
+    , active:true (at least one message is received since last boot.)|false (otherwise)
+    , nodeprofile : {
+         version: VERSION(0x82) , id: ID(0x83) ,date: PRODUCTION_DATE(0x8e / optional))
+    }
+    , devices :{
+        DEVICE_ID (etc. DomesticHomeAirConditioner_1) : {
+              eoj : object identifier (eg. 0x013001)
+            , active :  true (the device is registered to the controller)
+                        | false (the user deleted this device)
+                        | null (the device is not registered yet)
+            , location : 0x81
+            , error : 0x88
+            , date : PRODUCTION_DATE (0x8e / optional)
+            , worktime : cumulated working time (0x9a / optional)
+            , propertymap : [] array of available properties
+            , options : {} device specific information extracted from devices DB
+        },
+    }
+    , eoj_id_map : {    // EOJ (eg.013001) to DEVICE_ID (eg. DomesticHomeAirConditioner_1) mapping
+        EOJ: DEVICE_ID,
+    }
 }
 */
 
-function expandDeviceIdFromPossiblyRegExpDeviceId(device_id_with_regexp){
-	var re = [] ;
-	var regexp = new RegExp(device_id_with_regexp) ;
-	for( var mac in macs ){
-		for( var devid in macs[mac].devices ){
-			if( devid.match(regexp) ){
-				re.push(devid) ;
-			}
-		}
-	}
+function expandDeviceIdFromPossiblyRegExpDeviceId(deviceIdWithRegexp) {
+    let re = [];
+    let regexp = new RegExp(deviceIdWithRegexp);
+    for (const macinfo of Object.values(macs)) {
+        for (const devid of Object.keys(macinfo.devices)) {
+            if (devid.match(regexp)) {
+                re.push(devid);
+            }
+        }
+    }
 
-	return re ;
+    return re;
 }
 
-function getMacFromDeviceId(device_id){
-	for( var mac in macs ){
-		for( var devid in macs[mac].devices ){
-			if( devid == device_id ){
-				return mac ;
-			}
-		}
-	}
-	return undefined ;
+function getMacFromDeviceId(deviceId) {
+    for (const mac of Object.keys(macs)) {
+        for (const devid of Object.keys(macs[mac].devices)) {
+            if (devid == deviceId) {
+                return mac;
+            }
+        }
+    }
+    return undefined;
 }
 
-function assert(bAssertion,msg){
-	if( bAssertion === true ) return ;
-	if( typeof msg == 'string' )
-		log('Assertion failed:'+msg);
-	else
-		log('Assertion failed');
+function assert(bAssertion, msg) {
+    if (bAssertion === true) return;
+    if (typeof msg == 'string') {
+        log('Assertion failed:'+msg);
+    } else {
+        log('Assertion failed');
+    }
 }
 
-let ELDB = {} ;
+let ELDB = {};
 
-const IP_UNDEFINED = '-' ;
+const IP_UNDEFINED = '-';
 
 module.exports.init = init;
-async function init(pi /*,globals*/){
-	pluginInterface = pi ;
-	log = pluginInterface.log ;
+async function init(_pluginInterface) {
+    pluginInterface = _pluginInterface;
+    const pi = pluginInterface;
+    log = pi.log;
 
-	localStorage = pluginInterface.localStorage ;
-	macs = localStorage.getItem('macs',{}) ;
-	//MAKER_CODE = localStorage.getItem('makercode',MAKER_CODE) ;
+    localStorage = pi.localStorage;
+    macs = localStorage.getItem('macs', {});
+    // MAKER_CODE = localStorage.getItem('makercode',MAKER_CODE) ;
 
-	// Reset states
-	for( const mac in macs ){
-		macs[mac].active = false ;
-		for( const devid in macs[mac].devices )
-			macs[mac].devices[devid].active = false ;
-	}
+    // Reset states
+    for (const macinfo of Object.values(macs)) {
+        macinfo.active = false;
+        for (const dev of Object.values(macinfo.devices)) {
+            dev.active = false;
+        }
+    }
 
-	function setIPAddressAsUnknown(ip){
-		if( ip == IP_UNDEFINED ) return ;
-		for( const mac in macs ){
-			if( macs[mac].ip !== ip) continue ;
-			macs[mac].ip = IP_UNDEFINED;
-			// macs[mac].active = false;
-		}
-	}
+    function setIPAddressAsUnknown(ip) {
+        if (ip == IP_UNDEFINED) return;
+        for (const macinfo of Object.values(macs)) {
+            if (macinfo.ip !== ip) continue;
+            macinfo.ip = IP_UNDEFINED;
+            // macinfo.active = false;
+        }
+    }
 
-	pluginInterface.setNetCallbacks({
-		 onMacFoundCallback : function(net,newmac,newip){
-			log(`onMacFoundCallback("${arguments[0]}","${arguments[1]}","${arguments[2]}")`);
-			assert( net == mynet , 'onMacFoundCallback' );
+    pi.setNetCallbacks({
+        onMacFoundCallback: function(net, newmac, newip) {
+            log(`onMacFoundCallback("${net}","${newmac}","${newip}")`);
+            assert(net == mynet, 'onMacFoundCallback');
 
-			setIPAddressAsUnknown(newip);
-			// Really new MAC (if it is an ECHONET device, it will be discovered later.)
-			if( macs[newmac] == null ) return ;
-			macs[newmac].active = true ;
-			macs[newmac].ip = newip ;
-		 }
-		,onMacLostCallback : function(net,lostmac,lostip){
-			log(`onMacLostCallback("${arguments[0]}","${arguments[1]}","${arguments[2]}")`);
-			assert( net == mynet , 'onMacLostCallback' );
-			setIPAddressAsUnknown(lostip);
-			if( macs[lostmac] != null )
-				macs[lostmac].active = false ;
-		}
-		,onIPChangedCallback : function(net,mac,oldip,newip){
-			log(`onIPChangedCallback("${arguments[0]}","${arguments[1]}","${arguments[2]}","${arguments[3]}")`);
-			assert( net == mynet , 'onIPChangedCallback' );
-			setIPAddressAsUnknown(newip);
-			assert( macs[mac].ip == oldip , 'onIPChangedCallback : old ip '+oldip+'does not exist' );
-			macs[mac].ip = newip ;
-		 	EL.sendOPC1( EL.EL_Multi, [0x0e,0xf0,0x01], [0x0e,0xf0,0x01], 0x73, 0xd5, EL.Node_details["d5"] );
-		}
-	}) ;
+            setIPAddressAsUnknown(newip);
+            // Really new MAC (if it is an ECHONET device, it will be discovered later.)
+            if (macs[newmac] == null) return;
+            macs[newmac].active = true;
+            macs[newmac].ip = newip;
+        },
+        onMacLostCallback: function(net, lostmac, lostip) {
+            log(`onMacLostCallback("${net}","${lostmac}","${lostip}")`);
+            assert(net == mynet, 'onMacLostCallback');
+            setIPAddressAsUnknown(lostip);
+            if (macs[lostmac] != null) {
+                macs[lostmac].active = false;
+            }
+        },
+        onIPChangedCallback: function(net, mac, oldip, newip) {
+            log(`onIPChangedCallback("${net}","${mac}","${oldip}","${newip}")`);
+            assert(net == mynet, 'onIPChangedCallback');
+            setIPAddressAsUnknown(newip);
+            assert(
+                macs[mac].ip == oldip,
+                'onIPChangedCallback : old ip ' + oldip + 'does not exist');
+            macs[mac].ip = newip;
+            EL.sendOPC1(
+                EL.EL_Multi,
+                [0x0e, 0xf0, 0x01], [0x0e, 0xf0, 0x01],
+                0x73, 0xd5, EL.Node_details['d5']);
+        },
+    });
 
-	// Set mynet: Take the first one.
-	//   This should be specified through GUI in the future.
-	const myMACs = pluginInterface.getMACs(true) ;
-	for( const mynet_caididate in myMACs ){
-		mynet = myMACs[mynet_caididate].net ;
-		break ;
-	}
+    // Set mynet: Take the first one.
+    //   This should be specified through GUI in the future.
+    const myMACs = pi.getMACs(true);
+    for (const macinfo of Object.values(myMACs)) {
+        mynet = macinfo.net;
+        break;
+    }
 
+    const readJSON = (basename) => {
+        const path = pathm.join(pi.getpath(), basename);
+        return JSON.parse(fs.readFileSync(path, 'utf-8').toString());
+    };
 
-	// Initialize echonet lite
-	const MY_PROPS = JSON.parse( fs.readFileSync(pluginInterface.getpath()+'controller_properties.json','utf-8')) ;
-	// Copy maker code to node profile
-	if( MY_PROPS['8a'] != undefined )
-		EL.Node_details['8a'] = MY_PROPS['8a'] ;
+    // Initialize echonet lite
+    const MY_PROPS = readJSON('controller_properties.json');
+    // Copy maker code to node profile
+    if (MY_PROPS['8a'] != undefined) {
+        EL.Node_details['8a'] = MY_PROPS['8a'];
+    }
 
-	// Construct ELDB
-	// Load database with minimization / resource embedding
-	{
-		let data = JSON.parse( fs.readFileSync(pluginInterface.getpath()+'all_Body.json','utf-8')) ;
-		let names = JSON.parse( fs.readFileSync(pluginInterface.getpath()+'all_'+LOCALE+'.json','utf-8')).names ;
-		for( let objname in data.elObjects ){
-			let objnamelc = objname.substring(2).toLowerCase() ;
-			let eoj = data.elObjects[objname] ;
-			let minimize_obj
-				= {objectType:eoj.objectType , objectName:names[eoj.objectName] , epcs:{}} ;
+    // Construct ELDB
+    // Load database with minimization / resource embedding
+    {
+        let data = readJSON('all_Body.json');
+        let names = readJSON('all_'+LOCALE+'.json').names;
+        for (const [objname, eoj] of Object.entries(data.elObjects)) {
+            let objnamelc = objname.substring(2).toLowerCase();
+            let minimizeObj = {
+                objectType: eoj.objectType,
+                objectName: names[eoj.objectName],
+                epcs: {},
+            };
 
-			for( let epcname in eoj.epcs ){
-				let edtconvs = undefined ;
-				try {
-					edtconvs = ProcConverter.eojs[objnamelc][epcname.substring(2).toLowerCase()] ;
-				} catch(e){}
-				minimize_obj.epcs[epcname.substring(2).toLowerCase()] = {
-					epcType : eoj.epcs[epcname].epcType
-					, epcName : names[eoj.epcs[epcname].epcName]
-					, epcDoc : eoj.epcs[epcname].doc
-					, edtConvFuncs : edtconvs
-					, test : eoj.epcs[epcname].test
-				} ;
-			}
-			ELDB[objnamelc] = minimize_obj ;
-		}
-		delete data ;
-		delete names ;
+            for (const [epcname, epc] of Object.entries(eoj.epcs)) {
+                let edtconvs = undefined;
+                try {
+                    const epcid = epcname.substring(2).toLowerCase();
+                    edtconvs = ProcConverter.eojs[objnamelc][epcid];
+                } catch (e) {}
+                minimizeObj.epcs[epcname.substring(2).toLowerCase()] = {
+                    epcType: epc.epcType,
+                    epcName: names[epc.epcName],
+                    epcDoc: epc.doc,
+                    edtConvFuncs: edtconvs,
+                    test: epc.test,
+                };
+            }
+            ELDB[objnamelc] = minimizeObj;
+        }
+        delete data;
+        delete names;
 
-		// add superclass epcs to subclasses
-		let sepcs = ELDB['0000'].epcs ;
-		for( let sepc in sepcs )	sepcs[sepc].super = true ;
+        // add superclass epcs to subclasses
+        let sepcs = ELDB['0000'].epcs;
+        for (const sepc of Object.keys(sepcs)) sepcs[sepc].super = true;
 
-		for( let oeoj in ELDB ){
-			if( oeoj == '0000' ) continue ;
-			for( let sepc in sepcs )
-				if( ELDB[oeoj].epcs[sepc] == undefined )
-					ELDB[oeoj].epcs[sepc] = sepcs[sepc] ;
-				else if(ELDB[oeoj].epcs[sepc].edtConvFuncs == undefined )
-					ELDB[oeoj].epcs[sepc].edtConvFuncs = sepcs[sepc].edtConvFuncs ;
-		}
-	}
-	// fs.writeFileSync(pluginInterface.getpath()+'minimized.json',JSON.stringify(ELDB ,null,"\t")) ;
+        for (const [oeoj, elObj] of Object.entries(ELDB)) {
+            if (oeoj == '0000') continue;
+            for (const sepc of Object.keys(sepcs)) {
+                if (elObj.epcs[sepc] == undefined) {
+                    elObj.epcs[sepc] = sepcs[sepc];
+                } else if (elObj.epcs[sepc].edtConvFuncs == undefined) {
+                    elObj.epcs[sepc].edtConvFuncs = sepcs[sepc].edtConvFuncs;
+                }
+            }
+        }
+    }
+    // fs.writeFileSync(pi.getpath()+'minimized.json',JSON.stringify(ELDB ,null,"\t")) ;
 
-	// Replace the original function	
-	// ネットワーク内のEL機器全体情報を更新する，受信したら勝手に実行される
-	EL.renewFacilities = function( ip, els ) {
-		//console.dir(els) ;
-		//log(`getMACFromIPv4Address(${mynet},${ip})`);
-		pluginInterface.getMACFromIPv4Address(mynet,ip,true).then(mac=>{
-			try {
-				const seoj = els.SEOJ.substring(0,4) ;
-				var epcList = EL.parseDetail( els.OPC, els.DETAIL );
-				if(ELDB[seoj] == undefined) {
-					log(`A message from unknown EOJ ${seoj} on ${ip} is ignored.`);
-					return ;
-				}
-				if( macs[mac] == undefined ){
-					macs[mac] = {ip:ip,active:true,nodeprofile:{},devices:{},eoj_id_map:{}} ;
-				} else {
-					macs[mac].active = true ;
-					setIPAddressAsUnknown(macs[mac].ip) ;
-					macs[mac].ip = ip ; // ip may be changed
-				}
+    // Replace the original function
+    // ネットワーク内のEL機器全体情報を更新する，受信したら勝手に実行される
+    EL.renewFacilities = function(ip, els) {
+        // console.dir(els) ;
+        // log(`getMACFromIPv4Address(${mynet},${ip})`);
+        pi.getMACFromIPv4Address(mynet, ip, true).then((mac)=>{
+            try {
+                const seoj = els.SEOJ.substring(0, 4);
+                let epcList = EL.parseDetail(els.OPC, els.DETAIL);
+                if (ELDB[seoj] == undefined) {
+                    log(`A message from unknown EOJ ${seoj} on ${ip} is ignored.`); // eslint-disable-line max-len
+                    return;
+                }
+                if (macs[mac] == undefined) {
+                    macs[mac] = {
+                        ip: ip,
+                        active: true,
+                        nodeprofile: {},
+                        devices: {},
+                        eoj_id_map: {},
+                    };
+                } else {
+                    macs[mac].active = true;
+                    setIPAddressAsUnknown(macs[mac].ip);
+                    macs[mac].ip = ip; // ip may be changed
+                }
 
-				var mm = macs[mac] ;
+                let mm = macs[mac];
 
-				// 機器が発見された
-				function onDevFound(eoj){
-					if( mm.eoj_id_map[eoj] != undefined ) {
-						// Already defined device
-						var dev = mm.devices[ mm.eoj_id_map[eoj] ] ;
-						if( dev.active !== true ){	// First time since last boot
-							registerExistingDevice(mm.eoj_id_map[eoj]) ;
-							EL.getPropertyMaps( ip, EL.toHexArray(eoj) );
-							//log('Predefined device '+mm.eoj_id_map[els.SEOJ]+' replied') ;
-						}
-					} else if(ELDB[eoj.slice(0,4)] == undefined) {
-						log(`EOJ ${eoj} on ${ip} is not found in ECHONET Lite DB.`);
-						return ;
-					} else {
-						var devid = ELDB[eoj.slice(0,4)].objectType ;
-						if( devid == undefined ) return ;
-						var c = localStorage.getItem(devid+'_Count',0) + 1 ;
-						localStorage.setItem(devid+'_Count',c) ;
+                // 機器が発見された
+                function onDevFound(eoj) {
+                    if (mm.eoj_id_map[eoj] != undefined) {
+                        // Already defined device
+                        let dev = mm.devices[mm.eoj_id_map[eoj]];
+                        if (dev.active !== true) { // First time since last boot
+                            registerExistingDevice(mm.eoj_id_map[eoj]);
+                            EL.getPropertyMaps(ip, EL.toHexArray(eoj));
+                            // log('Predefined device '+mm.eoj_id_map[els.SEOJ]+' replied') ;
+                        }
+                    } else if (ELDB[eoj.slice(0, 4)] == undefined) {
+                        log(`EOJ ${eoj} on ${ip} is not found in ECHONET Lite DB.`); // eslint-disable-line max-len
+                        return;
+                    } else {
+                        let devid = ELDB[eoj.slice(0, 4)].objectType;
+                        if (devid == undefined) return;
+                        let c = localStorage.getItem(devid+'_Count', 0) + 1;
+                        localStorage.setItem(devid+'_Count', c);
 
-						devid = devid+'_'+c ;
-						mm.eoj_id_map[eoj] = devid ;
-						mm.devices[devid] = { eoj : eoj } ;
-						log('New device '+devid+' found') ;
+                        devid = devid+'_'+c;
+                        mm.eoj_id_map[eoj] = devid;
+                        mm.devices[devid] = {eoj: eoj};
+                        log('New device '+devid+' found');
 
-						registerExistingDevice(devid) ;
-						EL.getPropertyMaps( ip, EL.toHexArray(eoj) );
-					}
-				}
+                        registerExistingDevice(devid);
+                        EL.getPropertyMaps(ip, EL.toHexArray(eoj));
+                    }
+                }
 
-				function instanceListProc(ilist){
-					var inst_num = parseInt(ilist.slice(0,2)) ;
-					var insts = ilist.slice(2) ;
-					while( insts.length>5 ){
-						onDevFound(insts.slice(0,6)) ;
-						insts = insts.slice(6) ;
-					}
-					savemac() ;
-				}
+                function instanceListProc(ilist) {
+                    // let instNum = parseInt(ilist.slice(0, 2));
+                    let insts = ilist.slice(2);
+                    while (insts.length>5) {
+                        onDevFound(insts.slice(0, 6));
+                        insts = insts.slice(6);
+                    }
+                    savemac();
+                }
 
-				if( seoj != '0ef0' ){
-					onDevFound(els.SEOJ) ;
-					savemac() ;
-				} else if(els.DEOJ == '0ef001' && els.ESV == '73'
-					&& els.DETAILs != undefined && els.DETAILs.d5 != undefined ){
-					// Device added to network announcement
-					instanceListProc(els.DETAILs.d5) ;
-				} else if(els.SEOJ == '0ef001' && els.ESV == '72'
-					&& els.DETAILs != undefined && els.DETAILs.d6 != undefined ){
-					// Respose for searching node instance list
-					instanceListProc(els.DETAILs.d6) ;
-				}
-
-
-				var tgt = (seoj=='0ef0' ? mm.nodeprofile : mm.devices[ mm.eoj_id_map[els.SEOJ] ]) ;
-				for( var epc in epcList ) {
-
-					let epco = undefined , epcType = undefined , edtConvFunc = undefined ;
-					/*if( seoj != '0ef0'){
-						epco = ELDB['0000'].epcs[epc] ;
-						if( epco != undefined ){
-							epcType = epco.epcType ;
-							if( epco.edtConvFuncs != undefined )	edtConvFunc = epco.edtConvFuncs[0] ;
-						}
-					}*/
-					if( ELDB[seoj] != undefined )	epco = ELDB[seoj].epcs[epc] ;
-					else							epco = ELDB['0000'].epcs[epc] ;
-					if( epco != undefined ){
-						if( epco.epcType != undefined )			epcType = epco.epcType ;
-						if( epco.edtConvFuncs != undefined )	edtConvFunc = epco.edtConvFuncs[0] ;
-					}
-					//}
-
-					if(epcType == undefined)	epcType = epc ;
-					if( epcList[epc]=='')	continue ;
-
-					let edt = epcList[epc] = EL.toHexArray(epcList[epc]) ;
-					let bEdtUpdated = (tgt[epcType]==undefined || JSON.stringify(tgt[epcType].cache) !== JSON.stringify(edt)) ;
-					if(bEdtUpdated)		tgt[epcType] = { cache : edt , timestamp : Date.now() } ;
-					else 				tgt[epcType].timestamp = Date.now() ;
-
-					// reply of get request? (works only for first OPC)
-					// Ideally, this process should be outside of epc loop, but
-					// just to easily get epc & edt, ESV=72 is exceptionally
-					// placed here.
-					if( procCallWaitList[els.TID] != undefined ){
-						if( els.ESV == '72' /* && els.OPC == '01'*/ ){
-							procCallWaitList[els.TID](
-								{epc:parseInt('0x'+epc),edt:edt
-								, value:(edtConvFunc==undefined?undefined:edtConvFunc(edt))}) ;
-							delete procCallWaitList[els.TID] ;
-						}	// ESV == '52' is processed outside of epc loop.
-					}
-
-					if( bEdtUpdated && seoj!='0ef0' /*nodeprofile does not publish*/){
-						pluginInterface.publish(mm.eoj_id_map[els.SEOJ] +'/'+epcType
-							, {epc:parseInt('0x'+epc),edt:edt
-							, value:(edtConvFunc==undefined?undefined:edtConvFunc(edt))} ) ;
-					}
-				}
+                if (seoj != '0ef0') {
+                    onDevFound(els.SEOJ);
+                    savemac();
+                } else if (els.DEOJ == '0ef001' && els.ESV == '73'
+                           && els.DETAILs != undefined
+                           && els.DETAILs.d5 != undefined) {
+                    // Device added to network announcement
+                    instanceListProc(els.DETAILs.d5);
+                } else if (els.SEOJ == '0ef001' && els.ESV == '72'
+                           && els.DETAILs != undefined
+                           && els.DETAILs.d6 != undefined) {
+                    // Respose for searching node instance list
+                    instanceListProc(els.DETAILs.d6);
+                }
 
 
-				// Reply of SetC request
-				if( procCallWaitList[els.TID] != undefined ){
-					if( els.ESV == '71' ){	// accepted
-						var epc_hex = els.DETAIL.slice(0,2) ;
-						let epco ;
-						if( ELDB[seoj] == undefined )	epco = ELDB['0000'].epcs[epc_hex] ;
-						else 							epco = ELDB[seoj].epcs[epc_hex] ;
-						var ret = {epc:parseInt('0x'+epc_hex) , epcName : epco.epcName , success:'SetC request accepted.'} ;
-						var cache = tgt[epco.epcType] ;
-						if( cache != null && cache.cache ){
-							ret.cache_edt = cache.cache ;
-							ret.cache_timestamp = cache.timestamp ;
-							var convfuncs = epco.edtConvFuncs ;//|| ELDB['0000'].epcs[epc_hex].edtConvFuncs ;
-							if( convfuncs != undefined )
-								ret.cache_value = convfuncs[0](cache.cache) ;
-						}
-						procCallWaitList[els.TID](ret) ;
-						delete procCallWaitList[els.TID] ;
-					} else if( els.ESV == '51' || els.ESV == '52' ){	// cannot reply
-						procCallWaitList[els.TID]({error:'Cannot complete the request.',els:els}) ;
-						delete procCallWaitList[els.TID] ;
-					}
-				}
+                const tgt = (seoj=='0ef0' ?
+                    mm.nodeprofile : mm.devices[mm.eoj_id_map[els.SEOJ]]);
+                for (const epc of Object.keys(epcList)) {
+                    let epco = undefined;
+                    let epcType = undefined;
+                    let edtConvFunc = undefined;
+                    /* if( seoj != '0ef0'){
+                        epco = ELDB['0000'].epcs[epc] ;
+                        if( epco != undefined ){
+                            epcType = epco.epcType ;
+                            if( epco.edtConvFuncs != undefined )    edtConvFunc = epco.edtConvFuncs[0] ;
+                        }
+                    }*/
+                    if (ELDB[seoj] != undefined) epco = ELDB[seoj].epcs[epc];
+                    else epco = ELDB['0000'].epcs[epc];
+                    if (epco != undefined) {
+                        if (epco.epcType != undefined) epcType = epco.epcType;
+                        if (epco.edtConvFuncs != undefined) {
+                            edtConvFunc = epco.edtConvFuncs[0];
+                        }
+                    }
+                    // }
 
-				savemac() ;
+                    if (epcType == undefined) epcType = epc;
+                    if (epcList[epc]=='') continue;
 
-			}catch(e) {
-				console.error("EL.renewFacilities error.");
-				console.dir(e);
-			}
-		}).catch( ()=>{
-			// Do nothing
-			log('No MAC is found for ip '+ip);
-		}) ;
-	};
+                    const edt = epcList[epc] = EL.toHexArray(epcList[epc]);
+                    const cache = tgt[epcType];
+                    const bEdtUpdated =
+                        (cache==undefined ||
+                         JSON.stringify(cache.cache) !== JSON.stringify(edt));
+                    if (bEdtUpdated) {
+                        tgt[epcType] = {cache: edt, timestamp: Date.now()};
+                    } else {
+                        cache.timestamp = Date.now();
+                    }
 
-	function onReceiveGetRequest( ip, els ){
-		try {
-			let esv = EL.GET_RES ;
-			const props = parseEDTs(els) ;
-			for( let prop of props ){
-				if( MY_PROPS[prop.epc] )
-					prop.edt = MY_PROPS[prop.epc] ;
-				else
-					esv = EL.GET_SNA ;
-				if( prop.edt == null || prop.edt.length == 0 )
-					esv = EL.GET_SNA ;
-			}
-			sendFrame( ip, els.TID, els.DEOJ, els.SEOJ, esv, props );
-		} catch(e){
-			console.error("onReceiveGetRequest error.");
-			console.dir(e);
-		}
-	}
+                    // reply of get request? (works only for first OPC)
+                    // Ideally, this process should be outside of epc loop, but
+                    // just to easily get epc & edt, ESV=72 is exceptionally
+                    // placed here.
+                    if (procCallWaitList[els.TID] != undefined) {
+                        if (els.ESV == '72' /* && els.OPC == '01'*/) {
+                            const value = edtConvFunc && edtConvFunc(edt);
+                            procCallWaitList[els.TID](
+                                {epc: parseInt('0x'+epc), edt: edt,
+                                    value: value});
+                            delete procCallWaitList[els.TID];
+                        } // ESV == '52' is processed outside of epc loop.
+                    }
 
-	var elsocket = EL.initialize(
-		[MY_EOJ.map(e=>('0'+e.toString(16)).slice(-2)).join('')] , ( rinfo, els , err ) => {
-			if(err){ log("EL Error:\n"+JSON.stringify(err,null,"\t")); return; }
-			if( els.DEOJ != '0ef000' && els.DEOJ != '0ef001' ){ // 0effxx has already been processed in echonet-lite npm
-				if( els.ESV == EL.GET )
-					onReceiveGetRequest(rinfo.address, els);
-			}
-		}) ;
+                    if (bEdtUpdated && seoj != '0ef0') {// nodeprofile does not publish
+                        const data = {
+                            epc: parseInt('0x'+epc),
+                            edt: edt,
+                            value: (edtConvFunc && edtConvFunc(edt)),
+                        };
+                        pi.publish(
+                            mm.eoj_id_map[els.SEOJ] + '/' + epcType,
+                            data);
+                    }
+                }
 
-	function searcher(){
-		EL.search();
-		if( --DEVICE_MULTICAST_INTITIAL_NUMBER > 0 )
-			 setTimeout(searcher,DEVICE_MULTICAST_INITIAL_INTERVAL) ;
-		else setInterval(()=>{EL.search();},DEVICE_MULTICAST_INTERVAL) ;
-	}
-	searcher() ;
+
+                // Reply of SetC request
+                if (procCallWaitList[els.TID] != undefined) {
+                    if (els.ESV == '71') { // accepted
+                        let epcHex = els.DETAIL.slice(0, 2);
+                        let epco;
+                        if (ELDB[seoj] == undefined) {
+                            epco = ELDB['0000'].epcs[epcHex];
+                        } else epco = ELDB[seoj].epcs[epcHex];
+                        let ret = {
+                            epc: parseInt('0x'+epcHex),
+                            epcName: epco.epcName,
+                            success: 'SetC request accepted.',
+                        };
+                        let cache = tgt[epco.epcType];
+                        if (cache != null && cache.cache) {
+                            ret.cache_edt = cache.cache;
+                            ret.cache_timestamp = cache.timestamp;
+                            let convfuncs = epco.edtConvFuncs;// || ELDB['0000'].epcs[epcHex].edtConvFuncs ;
+                            if (convfuncs != undefined) {
+                                ret.cache_value = convfuncs[0](cache.cache);
+                            }
+                        }
+                        procCallWaitList[els.TID](ret);
+                        delete procCallWaitList[els.TID];
+                    } else if (els.ESV == '51' || els.ESV == '52') { // cannot reply
+                        procCallWaitList[els.TID]({
+                            error: 'Cannot complete the request.',
+                            els: els,
+                        });
+                        delete procCallWaitList[els.TID];
+                    }
+                }
+
+                savemac();
+            } catch (e) {
+                console.error('EL.renewFacilities error.');
+                console.dir(e);
+            }
+        }).catch(()=>{
+            // Do nothing
+            log('No MAC is found for ip '+ip);
+        });
+    };
+
+    function onReceiveGetRequest(ip, els) {
+        try {
+            let esv = EL.GET_RES;
+            const props = parseEDTs(els);
+            for (let prop of props) {
+                if (MY_PROPS[prop.epc]) {
+                    prop.edt = MY_PROPS[prop.epc];
+                } else {
+                    esv = EL.GET_SNA;
+                }
+                if (prop.edt == null || prop.edt.length == 0) {
+                    esv = EL.GET_SNA;
+                }
+            }
+            sendFrame(ip, els.TID, els.DEOJ, els.SEOJ, esv, props);
+        } catch (e) {
+            console.error('onReceiveGetRequest error.');
+            console.dir(e);
+        }
+    }
+
+    const eojList = [MY_EOJ.map((e)=>('0'+e.toString(16)).slice(-2)).join('')];
+    EL.initialize(eojList, (rinfo, els, err) => {
+        if (err) {
+            log('EL Error:\n'+JSON.stringify(err, null, '\t')); return;
+        }
+        if (els.DEOJ != '0ef000' && els.DEOJ != '0ef001') { // 0effxx has already been processed in echonet-lite npm
+            if (els.ESV == EL.GET) {
+                onReceiveGetRequest(rinfo.address, els);
+            }
+        }
+    });
+
+    function searcher() {
+        EL.search();
+        if (--DEVICE_MULTICAST_INTITIAL_NUMBER > 0) {
+            setTimeout(searcher, DEVICE_MULTICAST_INITIAL_INTERVAL);
+        } else {
+            setInterval(()=>{
+                EL.search();
+            }, DEVICE_MULTICAST_INTERVAL);
+        }
+    }
+    searcher();
 } ;
 
-var procCallWaitList = {} ;
+const procCallWaitList = {};
 
-function getPropVal(devid,epc_hex){
-	//log('GetPropVal:'+JSON.stringify(arguments)) ;
-	return new Promise( (ac,rj)=>{
-		var tid = localStorage.getItem('TransactionID',1)+1 ;
-		if( tid > 0xFFFF ) tid = 1 ;
-		localStorage.setItem('TransactionID',tid) ;
+function getPropVal(devid, epcHex) {
+    // log('GetPropVal:'+JSON.stringify(arguments)) ;
+    return new Promise((ac, rj)=>{
+        let tid = localStorage.getItem('TransactionID', 1)+1;
+        if (tid > 0xFFFF) tid = 1;
+        localStorage.setItem('TransactionID', tid);
 
-		const mac = getMacFromDeviceId(devid) ;
-		const ip = macs[mac].ip ;
-		let deoj = macs[mac].devices[devid].eoj ;
-		deoj = [deoj.slice(0,2),deoj.slice(2,4),deoj.slice(-2)].map(e=>parseInt('0x'+e)) ;
+        const mac = getMacFromDeviceId(devid);
+        const ip = macs[mac].ip;
+        let deoj = macs[mac].devices[devid].eoj;
+        deoj = [deoj.slice(0, 2), deoj.slice(2, 4), deoj.slice(-2)].map((e) => {
+            parseInt('0x'+e);
+        });
 
-		if( ip === IP_UNDEFINED || macs[mac].active !== true){
-			rj({error: `The IP address of ${devid} is currently unknown.` });
-			return ;
-		}
+        if (ip === IP_UNDEFINED || macs[mac].active !== true) {
+            rj({error: `The IP address of ${devid} is currently unknown.`});
+            return;
+        }
 
-		buffer = new Buffer([
-			0x10, 0x81,
-			(tid>>8)&0xff, tid&0xff,
-			MY_EOJ[0], MY_EOJ[1], MY_EOJ[2],
-			deoj[0], deoj[1], deoj[2],
-			0x62,
-			0x01,
-			parseInt('0x'+epc_hex),
-			0x00]);
+        const buffer = new Buffer([
+            0x10, 0x81,
+            (tid>>8)&0xff, tid&0xff,
+            MY_EOJ[0], MY_EOJ[1], MY_EOJ[2],
+            deoj[0], deoj[1], deoj[2],
+            0x62,
+            0x01,
+            parseInt('0x'+epcHex),
+            0x00]);
 
-		var tid_key = ('000'+tid.toString(16)).slice(-4) ;
-		procCallWaitList[tid_key] = ac ;
-		EL.sendBase( ip, buffer );	// Send main
+        const tidKey = ('000'+tid.toString(16)).slice(-4);
+        procCallWaitList[tidKey] = ac;
+        EL.sendBase(ip, buffer); // Send main
 
-		setTimeout(()=>{
-			if( procCallWaitList[tid_key] == ac){
-				delete procCallWaitList[tid_key] ;
-				rj( {error:`GET request timeout:${devid}/${epc_hex}`} ) ;
-			}
-		},GET_TIMEOUT) ;
-	}) ;
+        setTimeout(()=>{
+            if (procCallWaitList[tidKey] == ac) {
+                delete procCallWaitList[tidKey];
+                rj({error: `GET request timeout:${devid}/${epcHex}`});
+            }
+        }, GET_TIMEOUT);
+    });
 }
 
-function setPropVal(devid,epc_hex,edt_array){
-	//log('SetPropVal:'+JSON.stringify(arguments)) ;
-	return new Promise( (ac,rj)=>{
-		var tid = localStorage.getItem('TransactionID',1)+1 ;
-		if( tid > 0xFFFF ) tid = 1 ;
-		localStorage.setItem('TransactionID',tid) ;
+function setPropVal(devid, epcHex, edtArray) {
+    // log('SetPropVal:'+JSON.stringify(arguments)) ;
+    return new Promise((ac, rj)=>{
+        let tid = localStorage.getItem('TransactionID', 1)+1;
+        if (tid > 0xFFFF) tid = 1;
+        localStorage.setItem('TransactionID', tid);
 
-		const mac = getMacFromDeviceId(devid) ;
-		const ip = macs[mac].ip ;
-		let deoj = macs[mac].devices[devid].eoj ;
-		deoj = [deoj.slice(0,2),deoj.slice(2,4),deoj.slice(-2)].map(e=>parseInt('0x'+e)) ;
+        const mac = getMacFromDeviceId(devid);
+        const ip = macs[mac].ip;
+        let deoj = macs[mac].devices[devid].eoj;
+        deoj = [deoj.slice(0, 2), deoj.slice(2, 4), deoj.slice(-2)].map((e) => {
+            parseInt('0x'+e);
+        });
 
-		if( ip === IP_UNDEFINED || macs[mac].active !== true){
-			rj({error: `The IP address of ${devid} is currently unknown.` });
-			return ;
-		}
+        if (ip === IP_UNDEFINED || macs[mac].active !== true) {
+            rj({error: `The IP address of ${devid} is currently unknown.`});
+            return;
+        }
 
-		buffer = new Buffer([
-			0x10, 0x81,
-			(tid>>8)&0xff, tid&0xff,
-			MY_EOJ[0], MY_EOJ[1], MY_EOJ[2],
-			deoj[0], deoj[1], deoj[2],
-			0x61,	// SetC, instead of SetI
-			0x01,
-			parseInt('0x'+epc_hex),
-			edt_array.length
-			].concat(edt_array));
+        const buffer = new Buffer([
+            0x10, 0x81,
+            (tid>>8)&0xff, tid&0xff,
+            MY_EOJ[0], MY_EOJ[1], MY_EOJ[2],
+            deoj[0], deoj[1], deoj[2],
+            0x61, // SetC, instead of SetI
+            0x01,
+            parseInt('0x'+epcHex),
+            edtArray.length,
+        ].concat(edtArray));
 
-		var tid_key = ('000'+tid.toString(16)).slice(-4) ;
-		procCallWaitList[tid_key] = ac ;
-		EL.sendBase( ip, buffer );	// Send main
+        const tidKey = ('000'+tid.toString(16)).slice(-4);
+        procCallWaitList[tidKey] = ac;
+        EL.sendBase(ip, buffer); // Send main
 
-		setTimeout(()=>{
-			if( procCallWaitList[tid_key] == ac){
-				delete procCallWaitList[tid_key] ;
-				rj( {error:`PUT request timeout:${devid}/${epc_hex}=>${JSON.stringify(edt_array)}`} ) ;
-			}
-		},GET_TIMEOUT) ;
-	}) ;
+        setTimeout(()=>{
+            if (procCallWaitList[tidKey] == ac) {
+                delete procCallWaitList[tidKey];
+                rj({error: `PUT request timeout:${devid}/${epcHex}=>${JSON.stringify(edtArray)}`}); // eslint-disable-line max-len
+            }
+        }, GET_TIMEOUT);
+    });
 }
 
-function registerExistingDevice( devid ){
-	var mac = getMacFromDeviceId(devid) ;
-	var ip = macs[mac].ip ;
-	var dev = macs[mac].devices[devid] ;
+function registerExistingDevice(devid) {
+    let mac = getMacFromDeviceId(devid);
+    let ip = macs[mac].ip;
+    let dev = macs[mac].devices[devid];
 
-	if( dev.active === true ){
-		log('Cannot register '+devid+' twice.') ;
-		return ;
-	}
-	dev.active = true ;
-	savemac() ;
+    if (dev.active === true) {
+        log('Cannot register '+devid+' twice.');
+        return;
+    }
+    dev.active = true;
+    savemac();
 
-	log(`Device ${devid}:${ip} registered.`) ;
+    log(`Device ${devid}:${ip} registered.`);
 }
 
-function parseEDTs(els){
-	const props = [] ;
-	const array = EL.toHexArray( els.DETAIL ) ; //EDTs
-	let now = 0 ;
-	for( let i = 0; i< els.OPC; i++ ){
-		const epc = array[now] ;
-		now++ ;
-		const pdc = array[now] ;
-		now++ ;
-		const edt = [] ;
-		for( let j = 0; j < pdc; j++ ){
-			edt.push(array[now]) ;
-			now++ ;
-		}
-		props.push({'epc': EL.toHexString(epc), 'edt': EL.bytesToString(edt)}) ;
-	}
-	return props ;
+function parseEDTs(els) {
+    const props = [];
+    const array = EL.toHexArray(els.DETAIL); // EDTs
+    let now = 0;
+    for (let i = 0; i< els.OPC; i++) {
+        const epc = array[now];
+        now++;
+        const pdc = array[now];
+        now++;
+        const edt = [];
+        for (let j = 0; j < pdc; j++) {
+            edt.push(array[now]);
+            now++;
+        }
+        props.push({'epc': EL.toHexString(epc), 'edt': EL.bytesToString(edt)});
+    }
+    return props;
 }
 
 // send echonet-lite frame with multiple properties
-function sendFrame( ip, tid, seoj, deoj, esv, properties ){
-	if( typeof(tid) == "string" ){
-		tid = EL.toHexArray(tid) ;
-	}
+function sendFrame(ip, tid, seoj, deoj, esv, properties) {
+    if (typeof(tid) == 'string') {
+        tid = EL.toHexArray(tid);
+    }
 
-	if( typeof(seoj) == "string" ){
-		seoj = EL.toHexArray(seoj) ;
-	}
+    if (typeof(seoj) == 'string') {
+        seoj = EL.toHexArray(seoj);
+    }
 
-	if( typeof(deoj) == "string" ){
-		deoj = EL.toHexArray(deoj) ;
-	}
+    if (typeof(deoj) == 'string') {
+        deoj = EL.toHexArray(deoj);
+    }
 
-	if( typeof(esv) == "string" ){
-		esv = (EL.toHexArray(esv))[0] ;
-	}
+    if (typeof(esv) == 'string') {
+        esv = (EL.toHexArray(esv))[0];
+    }
 
-	let propBuff = [];
-	for( const prop of properties ){
-		let epc = prop.epc ;
-		if( typeof(epc) == "string" ){
-			epc = (EL.toHexArray(epc))[0] ;
-		}
+    let propBuff = [];
+    for (const prop of properties) {
+        let epc = prop.epc;
+        if (typeof(epc) == 'string') {
+            epc = (EL.toHexArray(epc))[0];
+        }
 
-		let edt = prop.edt ;
-		if( typeof(edt) == "number" ){
-			edt = [edt] ;
-		}else if( typeof(edt) == "string" ){
-			edt = EL.toHexArray(edt) ;
-		}
-		propBuff = propBuff.concat([epc, edt.length]) ;	// EPC, PDC
-		propBuff = propBuff.concat(edt) ;				// EDT
-	}
+        let edt = prop.edt;
+        if (typeof(edt) == 'number') {
+            edt = [edt];
+        } else if (typeof(edt) == 'string') {
+            edt = EL.toHexArray(edt);
+        }
+        propBuff = propBuff.concat([epc, edt.length]); // EPC, PDC
+        propBuff = propBuff.concat(edt); // EDT
+    }
 
-	var buffer;
-	buffer = new Buffer([
-		0x10, 0x81,
-		tid[0], tid[1],
-		seoj[0], seoj[1], seoj[2],
-		deoj[0], deoj[1], deoj[2],
-		esv,
-		properties.length].concat(propBuff));
-	EL.sendBase( ip, buffer ) ;
+    let buffer;
+    buffer = new Buffer([
+        0x10, 0x81,
+        tid[0], tid[1],
+        seoj[0], seoj[1], seoj[2],
+        deoj[0], deoj[1], deoj[2],
+        esv,
+        properties.length].concat(propBuff));
+    EL.sendBase(ip, buffer);
 }
 
-///////////////////////////////////////////////////////
-///////////////////////////////////////////////////////
-///
-///           Procedure call request
-///
+// /////////////////////////////////////////////////////
+// /////////////////////////////////////////////////////
+// /
+// /           Procedure call request
+// /
 
 
 module.exports.onCall = onProcCall;
-function onProcCall( method , path /*_devid , propname*/ , args ){
-	let path_split = path.split('/') ;
-	const _devid = path_split.shift() ;
+function onProcCall(method, path /* _devid , propname*/, args) {
+    const pathSplit = path.split('/');
+    const _devid = pathSplit.shift();
 
-	if( path_split.length>=2 ){ // Dirty code, just for compatibility
-		method = path_split.pop().toUpperCase() ;
-		if( args.edt == null )
-			args.edt = args.value ;
-	}
-	const propname = path_split.join('/') ;
+    if (pathSplit.length>=2) { // Dirty code, just for compatibility
+        method = pathSplit.pop().toUpperCase();
+        if (args.edt == null) {
+            args.edt = args.value;
+        }
+    }
+    const propname = pathSplit.join('/');
 
-	if( _devid == '' || propname == '' ){
-		switch(method){
-		case 'GET' :
-			return onProcCall_Get( method , _devid , propname , args ) ;
-		case 'PUT' :
-		case 'SET' :
-			return onProcCall_Put( method , _devid , propname , args ) ;
-		}
-		return {error:`The specified method ${method} is not implemented in echonet lite plugin.`} ;
-	}
-	var devids = expandDeviceIdFromPossiblyRegExpDeviceId(
-		decodeURIComponent(_devid)) ;
-	switch(method){
-	case 'GET' :
-		return new Promise( (acpt,rjct)=>{
-			Promise.all( devids.map(devid=>new Promise( (ac,rj)=>{
-					Promise.all([onProcCall_Get( method , devid , propname , args )])
-						.then( re=>{ ac([devid,re[0]]) ; }).catch(err=>{ac([devid,err]);}) ;
-			})) ).then(re=>{
-				var res = {} ;
-				re.forEach(_re=>{
-					var key = `/${VERSION}/${pluginInterface.getprefix()}/${_re[0]}/${propname}` ;
-					res[key]=_re[1];
-				}) ;
-				acpt(res) ;
-			})
-		}) ;
-	case 'PUT' :
-	case 'SET' :
-		return new Promise( (acpt,rjct)=>{
-			Promise.all( devids.map(devid=>new Promise( (ac,rj)=>{
-				Promise.all([onProcCall_Put( method , devid , propname , args )])
-					.then( re=>{ ac([devid,re[0]]) ; }).catch(err=>{ac([devid,err]);}) ;
-			})) ).then(re=>{
-				var res = {} ;
-				re.forEach(_re=>{
-					var key = `/${VERSION}/${pluginInterface.getprefix()}/${_re[0]}/${propname}` ;
-					res[key]=_re[1];
-				}) ;
-				acpt(res) ;
-			}).catch(rjct);
-		}) ;
-		//return onProcCall_Put( method , devid , propname , args ) ;
-	}
-	return {error:`The specified method ${method} is not implemented in echonet lite plugin.`} ;
+    if (_devid == '' || propname == '') {
+        switch (method) {
+        case 'GET':
+            return onProcCallGet(method, _devid, propname, args);
+        case 'PUT':
+        case 'SET':
+            return onProcCallPut(method, _devid, propname, args);
+        }
+        return {error: `The specified method ${method} is not implemented in echonet lite plugin.`}; // eslint-disable-line max-len
+    }
+    let devids = expandDeviceIdFromPossiblyRegExpDeviceId(
+        decodeURIComponent(_devid));
+    switch (method) {
+    case 'GET':
+        return new Promise((acpt, rjct)=>{
+            Promise.all(devids.map((devid)=>new Promise((ac, rj)=>{
+                Promise.all([onProcCallGet(method, devid, propname, args)])
+                    .then((re)=>{
+                        ac([devid, re[0]]);
+                    }).catch((err)=>{
+                        ac([devid, err]);
+                    });
+            }))).then((re)=>{
+                let res = {};
+                re.forEach((_re)=>{
+                    let key = `/${VERSION}/${pluginInterface.getprefix()}/${_re[0]}/${propname}`; // eslint-disable-line max-len
+                    res[key]=_re[1];
+                });
+                acpt(res);
+            });
+        });
+    case 'PUT':
+    case 'SET':
+        return new Promise((acpt, rjct)=>{
+            Promise.all(devids.map((devid)=>new Promise((ac, rj)=>{
+                Promise.all([onProcCallPut(method, devid, propname, args)])
+                    .then((re)=>{
+                        ac([devid, re[0]]);
+                    }).catch((err)=>{
+                        ac([devid, err]);
+                    });
+            }))).then((re)=>{
+                let res = {};
+                re.forEach((_re)=>{
+                    let key = `/${VERSION}/${pluginInterface.getprefix()}/${_re[0]}/${propname}`; // eslint-disable-line max-len
+                    res[key]=_re[1];
+                });
+                acpt(res);
+            }).catch(rjct);
+        });
+        // return onProcCallPut( method , devid , propname , args ) ;
+    }
+    return {error: `The specified method ${method} is not implemented in echonet lite plugin.`}; // eslint-disable-line max-len
 }
 
-function onProcCall_Get( method , devid , propname , args ){
-	if( devid == '' ){	// access 'echonet/' => device list
-		var devices = {} ;
+function onProcCallGet(method, devid, propname, args) {
+    if (devid == '') { // access 'echonet/' => device list
+        let devices = {};
 
-		for( let mac in macs ){
-			for( let devid in macs[mac].devices ){
-				let dev = macs[mac].devices[devid] ;
-				devices[devid]={
-					mac:mac
-					,ip:macs[mac].ip
-					,active: dev.active
-					,eoj:dev.eoj
-				} ;
+        for (const [mac, macinfo] of Object.entries(macs)) {
+            for (const dev of Object.values(macinfo.devices)) {
+                devices[devid]={
+                    mac: mac,
+                    ip: macinfo.ip,
+                    active: dev.active,
+                    eoj: dev.eoj,
+                };
 
-				if( args.option === 'true'){
-					devices[devid].option = {
-						doc : {
-							short : `EOJ:${dev.eoj} IP:${macs[mac].ip}`
-							,long : (dev.active?'Active':'Inactive')+".\nMac address: "+mac
-						}
-						, leaf : false
-					} ;
-				}
-			}
-		}
-		return devices ;
-	}
+                if (args.option === 'true') {
+                    const desc = (dev.active ? 'Active' : 'Inactive')
+                          + '.\nMac address: ' + mac;
+                    devices[devid].option = {
+                        doc: {
+                            short: `EOJ:${dev.eoj} IP:${macinfo.ip}`,
+                            long: desc,
+                        },
+                        leaf: false,
+                    };
+                }
+            }
+        }
+        return devices;
+    }
 
-	const mac = getMacFromDeviceId(devid) ;
-	if( mac == undefined )  return {error:'No such device:'+devid} ;
-	const dev = macs[mac].devices[devid] ;
-	const eoj = dev.eoj.substring(0,4) ;
-	if( propname == '' ){	// access 'echonet/devid/' => property list
-		// Ideally, property map should be checked.
-		var names ;
-		if( args.option === 'true'){
-			names = JSON.parse( fs.readFileSync(
-				pluginInterface.getpath()+'all_'+LOCALE+'.json','utf-8')).names ;
-		}
+    const mac = getMacFromDeviceId(devid);
+    if (mac == undefined) return {error: 'No such device:'+devid};
+    const dev = macs[mac].devices[devid];
+    const eoj = dev.eoj.substring(0, 4);
+    if (propname == '') { // access 'echonet/devid/' => property list
+        // Ideally, property map should be checked.
+        let names;
+        if (args.option === 'true') {
+            names = JSON.parse(fs.readFileSync(pathm.join(
+                pluginInterface.getpath(),
+                'all_'+LOCALE+'.json'), 'utf-8')).names;
+        }
 
-		var re = {} ;
-		var cache_edt, cache_value, cacheStr , cache_timestamp ;
-		/*// Super class
-		if( eoj != '0ef0'){
-			for( var epc in ELDB['0000'].epcs ){
-				var epco = ELDB['0000'].epcs[epc] ;
-				var epcType = epco.epcType ;
-				cache_edt = cache_value = cacheStr = cache_timestamp = undefined ;
-				if( dev[epcType] != undefined ){
-					cache_edt = dev[epcType].cache ;
-					cache_timestamp = dev[epcType].timestamp ;
-				}
-				// cache_value = undefined ;
+        let re = {};
+        let cacheEdt;
+        let cacheValue;
+        let cacheStr;
+        let cacheTimestamp;
+        /* // Super class
+        if( eoj != '0ef0'){
+            for (var epc of Object.keys(ELDB['0000'].epcs)) {
+                var epco = ELDB['0000'].epcs[epc] ;
+                var epcType = epco.epcType ;
+                cacheEdt = cacheValue = cacheStr = cacheTimestamp = undefined ;
+                if( dev[epcType] != undefined ){
+                    cacheEdt = dev[epcType].cache ;
+                    cacheTimestamp = dev[epcType].timestamp ;
+                }
+                // cacheValue = undefined ;
 
-				if( cache_edt != undefined && epco.edtConvFuncs != undefined && typeof epco.edtConvFuncs[0] == 'function' )
-					cache_value = epco.edtConvFuncs[0](cache_edt) ;
-				re[epcType] = {
-					super : true
-					, epc : parseInt('0x'+epc)
-					, cache_edt : cache_edt , cache_value : cache_value , cache_timestamp : cache_timestamp
-					, epcName : epco.epcName
-				} ;
+                if( cacheEdt != undefined && epco.edtConvFuncs != undefined && typeof epco.edtConvFuncs[0] == 'function' )
+                    cacheValue = epco.edtConvFuncs[0](cacheEdt) ;
+                re[epcType] = {
+                    super : true
+                    , epc : parseInt('0x'+epc)
+                    , cacheEdt : cacheEdt , cacheValue : cacheValue , cacheTimestamp : cacheTimestamp
+                    , epcName : epco.epcName
+                } ;
 
-				if( names != undefined ){
-					cacheStr = '' ;
-					if( cache_value != undefined ) cacheStr = ' Cache:'+cache_value ;
-					else if( cache_edt != undefined ) cacheStr = ' Cache:0x'+cache_edt.map(i=>('0'+i.toString(16)).slice(-2)).join('') ;
-					re[epcType].option = {
-						leaf : true
-						,doc : {
-							short : `${epco.epcName} EPC:${epc}`+cacheStr
-							,long : (epco.epcDoc==undefined?undefined:names[epco.epcDoc])
-						}
-					}
-				}
-			}
-		}*/
+                if( names != undefined ){
+                    cacheStr = '' ;
+                    if( cacheValue != undefined ) cacheStr = ' Cache:'+cacheValue ;
+                    else if( cacheEdt != undefined ) cacheStr = ' Cache:0x'+cacheEdt.map(i=>('0'+i.toString(16)).slice(-2)).join('') ;
+                    re[epcType].option = {
+                        leaf : true
+                        ,doc : {
+                            short : `${epco.epcName} EPC:${epc}`+cacheStr
+                            ,long : (epco.epcDoc==undefined?undefined:names[epco.epcDoc])
+                        }
+                    }
+                }
+            }
+        }*/
 
-		let propMap = {} ;
-		['StateChangeAnnouncementPropertyMap','SetPropertyMap','GetPropertyMap'].forEach(mname=>{
-			if( dev[mname] && dev[mname].cache ){
-				let c = dev[mname].cache ;
-				if( c[0] >= 16 )
-					c = EL.parseMapForm2(EL.bytesToString(c)) ;
-				c.slice(1,1+c[0]).forEach(epc_d=>{
-					propMap[epc_d.toString(16)] = null ;
-				})
-			}
-		});
+        let propMap = {};
+        const mnames = [
+            'StateChangeAnnouncementPropertyMap',
+            'SetPropertyMap',
+            'GetPropertyMap',
+        ];
+        mnames.forEach((mname)=>{
+            if (dev[mname] && dev[mname].cache) {
+                let c = dev[mname].cache;
+                if (c[0] >= 16) {
+                    c = EL.parseMapForm2(EL.bytesToString(c));
+                }
+                c.slice(1, 1+c[0]).forEach((epcd)=>{
+                    propMap[epcd.toString(16)] = null;
+                });
+            }
+        });
 
-		for( let epc in propMap ){
-			var epco = ELDB[eoj].epcs[epc] ;
-			if( epco == null ) continue ;
-			var epcType = epco.epcType ;
-			cache_edt = cache_value = cacheStr = cache_timestamp = undefined ;
-			if( dev[epcType] != undefined ){
-				cache_edt = dev[epcType].cache ;
-				cache_timestamp = dev[epcType].timestamp ;
-			}
-			//cache_value = undefined ;
-			if( cache_edt != undefined && epco.edtConvFuncs != undefined && typeof epco.edtConvFuncs[0] == 'function' ){
-				cache_value = epco.edtConvFuncs[0](cache_edt) ;
-			} else if(re[epcType]!=undefined )
-				cache_value = re[epcType].cache_value ;
-			re[epcType] = {
-				super : (epco.super === true)
-				, epc : parseInt('0x'+epc)
-				, cache_edt : cache_edt , cache_value : cache_value , cache_timestamp : cache_timestamp
-				, epcName : epco.epcName
-				//, epcDoc : (names==undefined||epco.epcDoc==undefined?undefined:names[epco.epcDoc])
-			} ;
+        for (const epc of Object.keys(propMap)) {
+            let epco = ELDB[eoj].epcs[epc];
+            if (epco == null) continue;
+            let epcType = epco.epcType;
+            cacheEdt = cacheValue = cacheStr = cacheTimestamp = undefined;
+            if (dev[epcType] != undefined) {
+                cacheEdt = dev[epcType].cache;
+                cacheTimestamp = dev[epcType].timestamp;
+            }
+            // cacheValue = undefined ;
+            if (cacheEdt != undefined
+                && epco.edtConvFuncs != undefined
+                && typeof epco.edtConvFuncs[0] == 'function') {
+                cacheValue = epco.edtConvFuncs[0](cacheEdt);
+            } else if (re[epcType]!=undefined) {
+                cacheValue = re[epcType].cacheValue;
+            }
+            re[epcType] = {
+                super: (epco.super === true),
+                epc: parseInt('0x'+epc),
+                cacheEdt: cacheEdt, cacheValue: cacheValue,
+                cacheTimestamp: cacheTimestamp,
+                epcName: epco.epcName,
+                // , epcDoc : (names==undefined||epco.epcDoc==undefined?undefined:names[epco.epcDoc])
+            };
 
-			if( names != undefined ){
-				cacheStr = '' ;
-				if( cache_value != undefined ) cacheStr = ' Cache:'+cache_value ;
-				else if( cache_edt != undefined ) cacheStr = ' Cache:0x'+cache_edt.map(i=>('0'+i.toString(16)).slice(-2)).join('') ;
-				re[epcType].option = {
-					leaf : true
-					,doc : {
-						short : `${epco.epcName} EPC:${epc}`+cacheStr
-						,long : (epco.epcDoc==undefined?undefined:names[epco.epcDoc])
-					}
-				} ;
-				if( epco.test instanceof Array )
-					re[epcType].option.test = epco.test ;
-			}
-		}
+            if (names != undefined) {
+                cacheStr = '';
+                if (cacheValue != undefined) {
+                    cacheStr = ' Cache:' + cacheValue;
+                } else if (cacheEdt != undefined) {
+                    const s = cacheEdt.map((i) => {
+                        ('0'+i.toString(16)).slice(-2);
+                    }).join('');
+                    cacheStr = ' Cache:0x' + s;
+                }
+                re[epcType].option = {
+                    leaf: true,
+                    doc: {
+                        short: `${epco.epcName} EPC:${epc}`+cacheStr,
+                        long: names[epco.epcDoc],
+                    },
+                };
+                if (epco.test instanceof Array) {
+                    re[epcType].option.test = epco.test;
+                }
+            }
+        }
 
-		delete names ;
+        delete names;
 
-		return re ;
-	}
+        return re;
+    }
 
-	const epcs = ELDB[eoj].epcs ;
-	let epc_hex ;
-	for( var epc in epcs ){
-		if( propname === epcs[epc].epcType ){
-			epc_hex = epc ;
-			break ;
-		}
-	}
-	if( epc_hex == undefined ){
-		if(propname.length == 2 && !isNaN(parseInt('0x'+propname)))
-			epc_hex = propname.toLowerCase() ;
-		else if(!isNaN(parseInt(propname)))
-			epc_hex = ('0'+(parseInt(propname)&0xff).toString(16)).slice(-2) ;
-		else return {error:'Unknown property name:'+propname} ;
-	}
-	
-	return getPropVal(devid,epc_hex) ;
+    const epcs = ELDB[eoj].epcs;
+    let epcHex;
+    for (const epc of Object.keys(epcs)) {
+        if (propname === epcs[epc].epcType) {
+            epcHex = epc;
+            break;
+        }
+    }
+    if (epcHex == undefined) {
+        if (propname.length == 2 && !isNaN(parseInt('0x'+propname))) {
+            epcHex = propname.toLowerCase();
+        } else if (!isNaN(parseInt(propname))) {
+            epcHex = ('0'+(parseInt(propname)&0xff).toString(16)).slice(-2);
+        } else return {error: 'Unknown property name:'+propname};
+    }
+
+    return getPropVal(devid, epcHex);
 }
 
-function onProcCall_Put( method , devid , propname , args ){
-	if( devid == '' || propname == '' || args==undefined || (args.value==undefined && args.edt == undefined ))
-		return {error:`Device id, property name, and the argument "value" or "edt" must be provided for ${method} method.`} ;
+function onProcCallPut(method, devid, propname, args) {
+    if (devid == '' || propname == '' || args==undefined ||
+        (args.value==undefined && args.edt == undefined)) {
+        return {error: `Device id, property name, and the argument "value" or "edt" must be provided for ${method} method.`}; // eslint-disable-line max-len
+    }
 
-	var mac = getMacFromDeviceId(devid) ;
-	if( mac == undefined )	return {error:'No such device:'+devid} ;
+    let mac = getMacFromDeviceId(devid);
+    if (mac == undefined) return {error: 'No such device:'+devid};
 
-	var epc_hex = undefined , edtConvFunc = undefined ;
-	var eoj = macs[mac].devices[devid].eoj.slice(0,4) ;
-	var epcs = ELDB[eoj].epcs ;
-	for( var epc in epcs ){
-		if( propname === epcs[epc].epcType ){
-			epc_hex = epc ;
-			break ;
-		}
-	}
-	if( epc_hex == undefined ){
-		if(propname.length == 2 && !isNaN(parseInt('0x'+propname)))
-			epc_hex = propname.toLowerCase() ;
-		else if(!isNaN(parseInt(propname)))
-			epc_hex = ('0'+(parseInt(propname)&0xff).toString(16)).slice(-2) ;
-		else return {error:'Unknown property name:'+propname} ;
-	}
+    let epcHex = undefined;
+    let edtConvFunc = undefined;
+    let eoj = macs[mac].devices[devid].eoj.slice(0, 4);
+    let epcs = ELDB[eoj].epcs;
+    for (const epc of Object.keys(epcs)) {
+        if (propname === epcs[epc].epcType) {
+            epcHex = epc;
+            break;
+        }
+    }
+    if (epcHex == undefined) {
+        if (propname.length == 2 && !isNaN(parseInt('0x'+propname))) {
+            epcHex = propname.toLowerCase();
+        } else if (!isNaN(parseInt(propname))) {
+            epcHex = ('0'+(parseInt(propname)&0xff).toString(16)).slice(-2);
+        } else return {error: 'Unknown property name:'+propname};
+    }
 
-	if( epcs[epc_hex] != undefined && epcs[epc_hex].edtConvFuncs != undefined )
-		edtConvFunc = epcs[epc_hex].edtConvFuncs[1] ;
-	else if( eoj != '0ef0' ){
-		var epco = ELDB['0000'].epcs[epc_hex] ;
-		if( epco != undefined && epco.edtConvFuncs != undefined )
-			edtConvFunc = epco.edtConvFuncs[1] ;
-	}
+    if (epcs[epcHex] != undefined && epcs[epcHex].edtConvFuncs != undefined) {
+        edtConvFunc = epcs[epcHex].edtConvFuncs[1];
+    } else if (eoj != '0ef0') {
+        let epco = ELDB['0000'].epcs[epcHex];
+        if (epco != undefined && epco.edtConvFuncs != undefined) {
+            edtConvFunc = epco.edtConvFuncs[1];
+        }
+    }
 
-	if( args.edt != null ){
-		if( ! (args.edt instanceof Array) ){
-			if( isNaN(args.edt) || !isFinite(args.edt) )
-				return {error:'edt is not a number nor number array'} ;
-			args.edt = [args.edt];
-		}
-	} else if(edtConvFunc != undefined){
-		args.edt = edtConvFunc(args.value) ;
-	} else
-		return {error:'No converter to generate edt from value.'} ;
+    if (args.edt != null) {
+        if (! (args.edt instanceof Array)) {
+            if (isNaN(args.edt) || !isFinite(args.edt)) {
+                return {error: 'edt is not a number nor number array'};
+            }
+            args.edt = [args.edt];
+        }
+    } else if (edtConvFunc != undefined) {
+        args.edt = edtConvFunc(args.value);
+    } else {
+        return {error: 'No converter to generate edt from value.'};
+    }
 
-	return setPropVal(devid,epc_hex,args.edt) ;
+    return setPropVal(devid, epcHex, args.edt);
 }

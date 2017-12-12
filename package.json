@@ -4,7 +4,8 @@
   "description": "ECHONET plugin of picogw",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "eslint ."
   },
   "repository": {
     "type": "git",
@@ -23,5 +24,9 @@
     "role": [
       "server"
     ]
+  },
+  "devDependencies": {
+    "eslint": "^4.13.1",
+    "eslint-config-google": "^0.9.1"
   }
 }

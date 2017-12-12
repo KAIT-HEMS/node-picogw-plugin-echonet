@@ -1,0 +1,17 @@
+{
+  "extends": ["google"],
+  "rules": {
+    "no-undef": "error",
+    "indent": "error",
+    "space-in-parens": "error",
+    "max-len": ["error", {"ignoreComments": true}],
+    "linebreak-style": ["error", "unix"]
+  },
+  "parserOptions": {
+    "ecmaVersion": 2017
+  },
+  "env": {
+    "es6": true,
+    "node": true
+  }
+}

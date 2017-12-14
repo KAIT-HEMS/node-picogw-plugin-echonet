@@ -715,7 +715,7 @@ function onProcCallGet(method, devid, propname, args) {
         let devices = {};
 
         for (const [mac, macinfo] of Object.entries(macs)) {
-            for (const dev of Object.values(macinfo.devices)) {
+            for (const [devid, dev] of Object.entries(macinfo.devices)) {
                 devices[devid]={
                     mac: mac,
                     ip: macinfo.ip,

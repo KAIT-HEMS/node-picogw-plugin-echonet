@@ -4,6 +4,7 @@
 const GET_TIMEOUT = 60 * 1000;
 const MY_EOJ = [0x05, 0xff, 0x01];
 const LOCALE = 'EN';
+const RESPONSE_PREFIX = '/v1/echonet';
 
 // first DEVICE_MULTICAST_INTITIAL_NUMBER accesses are done in every
 // DEVICE_MULTICAST_INITIAL_INTERVAL ms. Then the frequency becomes
@@ -11,8 +12,6 @@ const LOCALE = 'EN';
 let DEVICE_MULTICAST_INTITIAL_NUMBER = 4;
 const DEVICE_MULTICAST_INITIAL_INTERVAL = 15*1000;
 const DEVICE_MULTICAST_INTERVAL = 60*1000;
-
-let VERSION = 'v1';
 
 /* // If you add 'makercode' entry to localstorage.json (as a number), the number is
 // loaded to this MAKER_CODE variable.
@@ -680,7 +679,7 @@ function onProcCall(method, path /* _devid , propname*/, args) {
             }))).then((re)=>{
                 let res = {};
                 re.forEach((_re)=>{
-                    let key = `/${VERSION}/${pluginInterface.getprefix()}/${_re[0]}/${propname}`; // eslint-disable-line max-len
+                    let key = `${RESPONSE_PREFIX}/${_re[0]}/${propname}`;
                     res[key]=_re[1];
                 });
                 acpt(res);
@@ -699,7 +698,7 @@ function onProcCall(method, path /* _devid , propname*/, args) {
             }))).then((re)=>{
                 let res = {};
                 re.forEach((_re)=>{
-                    let key = `/${VERSION}/${pluginInterface.getprefix()}/${_re[0]}/${propname}`; // eslint-disable-line max-len
+                    let key = `${RESPONSE_PREFIX}/${_re[0]}/${propname}`;
                     res[key]=_re[1];
                 });
                 acpt(res);

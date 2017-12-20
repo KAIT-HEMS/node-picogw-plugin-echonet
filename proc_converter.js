@@ -424,7 +424,7 @@ exports.eojs = {
         'da': [hmForward, hmBackward],
         'db': [hmForward],
         'e1': [(x)=>x[0], (x)=>[parseInt(x)]],
-        'e2': [(x)=>enumForward(x, ECOCUTE_HEATING)],
+        'e2': [(x)=>enumForward(x, ON_OFF_41)],
         'e3': [(x)=>enumForward(x, ON_OFF_41), (x)=>enumBackward(x, ON_OFF_41)],
         'e4': [(x)=>enumForward(x, ON_OFF_41), (x)=>enumBackward(x, ON_OFF_41)],
         'e5': [(x)=>enumForward(x, ON_OFF_41), (x)=>enumBackward(x, ON_OFF_41)],

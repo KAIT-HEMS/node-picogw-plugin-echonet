@@ -101,14 +101,14 @@ const IP_UNDEFINED = '-';
 
 module.exports.init = init;
 async function init(_pluginInterface) {
-    pluginInterface = _pluginInterface;
+    pluginInterface = _pluginInterface ;
     const pi = pluginInterface;
     log = pi.log;
 
     localStorage = pi.localStorage;
     macs = localStorage.getItem('macs', {});
     // MAKER_CODE = localStorage.getItem('makercode',MAKER_CODE) ;
-
+    
     // Reset states
     for (const macinfo of Object.values(macs)) {
         macinfo.active = false;
@@ -126,7 +126,7 @@ async function init(_pluginInterface) {
         }
     }
 
-    pi.setNetCallbacks({
+    pi.net.setCallbacks({
         onMacFoundCallback: function(net, newmac, newip) {
             log(`onMacFoundCallback("${net}","${newmac}","${newip}")`);
             assert(net == mynet, 'onMacFoundCallback');
@@ -160,13 +160,19 @@ async function init(_pluginInterface) {
         },
     });
 
+
+
     // Set mynet: Take the first one.
     //   This should be specified through GUI in the future.
-    const myMACs = pi.getMACs(true);
-    for (const macinfo of Object.values(myMACs)) {
-        mynet = macinfo.net;
-        break;
+    //    const myMACs = pi.getMACs(true);
+    // mynet = 'enp0s8';
+    for( mynet in pi.net.getNetworkInterfaces() ){
+	break ;
     }
+    if( mynet != null ){
+	pi.net.setNetworkInterface(mynet);
+    }
+    log(JSON.stringify(pi.net.getNetworkInterfaces(),null,'\t'));
 
     const readJSON = (basename) => {
         const path = pathm.join(pi.getpath(), basename);
@@ -232,10 +238,13 @@ async function init(_pluginInterface) {
     // Replace the original function
     // ネットワーク内のEL機器全体情報を更新する，受信したら勝手に実行される
     EL.renewFacilities = function(ip, els) {
-        // console.dir(els) ;
         // log(`getMACFromIPv4Address(${mynet},${ip})`);
-        pi.getMACFromIPv4Address(mynet, ip, true).then((mac)=>{
-            try {
+//        pi.getMACFromIPv4Address(mynet, ip, true).then((mac)=>{
+	pi.net.registerIP(ip).then((registered_obj)=>{
+	    const mac = registered_obj.mac ;
+	    assert( ip == registered_obj.ip ) ;
+
+	    try {
                 const seoj = els.SEOJ.substring(0, 4);
                 let epcList = EL.parseDetail(els.OPC, els.DETAIL);
                 if (ELDB[seoj] == undefined) {
@@ -918,7 +927,6 @@ function onProcCallPut(method, devid, propname, args) {
             edtConvFunc = epco.edtConvFuncs[1];
         }
     }
-
     if (args.edt != null) {
         if (! (args.edt instanceof Array)) {
             if (isNaN(args.edt) || !isFinite(args.edt)) {

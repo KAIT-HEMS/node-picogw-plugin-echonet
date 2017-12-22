@@ -37,10 +37,10 @@ const LIGHTING_MODE_SETTING = [0x41, 'auto', 'standard', 'night', 'off', 'color'
 
 
 const enumForward = (value, array) => {
-    array[value[0]-array[0]+1];
+    return array[value[0]-array[0]+1];
 };
 const enumBackward = (value, array) => {
-    [array.indexOf(value.toLowerCase())-1+array[0]];
+    return [array.indexOf(value.toLowerCase())-1+array[0]];
 };
 
 // Pure enum

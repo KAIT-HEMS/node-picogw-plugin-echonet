@@ -101,14 +101,14 @@ const IP_UNDEFINED = '-';
 
 module.exports.init = init;
 async function init(_pluginInterface) {
-    pluginInterface = _pluginInterface ;
+    pluginInterface = _pluginInterface;
     const pi = pluginInterface;
     log = pi.log;
 
     localStorage = pi.localStorage;
     macs = localStorage.getItem('macs', {});
     // MAKER_CODE = localStorage.getItem('makercode',MAKER_CODE) ;
-    
+
     // Reset states
     for (const macinfo of Object.values(macs)) {
         macinfo.active = false;
@@ -161,18 +161,17 @@ async function init(_pluginInterface) {
     });
 
 
-
     // Set mynet: Take the first one.
     //   This should be specified through GUI in the future.
     //    const myMACs = pi.getMACs(true);
     // mynet = 'enp0s8';
-    for( mynet in pi.net.getNetworkInterfaces() ){
-	break ;
+    for (mynet in pi.net.getNetworkInterfaces()) {
+        break;
     }
-    if( mynet != null ){
-	pi.net.setNetworkInterface(mynet);
+    if (mynet != null) {
+        pi.net.setNetworkInterface(mynet);
     }
-    log(JSON.stringify(pi.net.getNetworkInterfaces(),null,'\t'));
+    log(JSON.stringify(pi.net.getNetworkInterfaces(), null, '\t'));
 
     const readJSON = (basename) => {
         const path = pathm.join(pi.getpath(), basename);
@@ -239,10 +238,10 @@ async function init(_pluginInterface) {
     // ネットワーク内のEL機器全体情報を更新する，受信したら勝手に実行される
     EL.renewFacilities = function(ip, els) {
         // log(`getMACFromIPv4Address(${mynet},${ip})`);
-//        pi.getMACFromIPv4Address(mynet, ip, true).then((mac)=>{
-	pi.net.registerIP(ip).then((registered_obj)=>{
-	    const mac = registered_obj.mac ;
-	    assert( ip == registered_obj.ip ) ;
+        //        pi.getMACFromIPv4Address(mynet, ip, true).then((mac)=>{
+        pi.net.registerIP(ip).then((registered_obj)=>{
+	    const mac = registered_obj.mac;
+	    assert(ip == registered_obj.ip);
 
 	    try {
                 const seoj = els.SEOJ.substring(0, 4);
@@ -488,9 +487,7 @@ function getPropVal(devid, epcHex) {
         const mac = getMacFromDeviceId(devid);
         const ip = macs[mac].ip;
         let deoj = macs[mac].devices[devid].eoj;
-        deoj = [deoj.slice(0, 2), deoj.slice(2, 4), deoj.slice(-2)].map((e) => {
-            parseInt('0x'+e);
-        });
+        deoj = [deoj.slice(0, 2), deoj.slice(2, 4), deoj.slice(-2)].map((e) => parseInt('0x'+e));
 
         if (ip === IP_UNDEFINED || macs[mac].active !== true) {
             rj({error: `The IP address of ${devid} is currently unknown.`});
@@ -530,9 +527,7 @@ function setPropVal(devid, epcHex, edtArray) {
         const mac = getMacFromDeviceId(devid);
         const ip = macs[mac].ip;
         let deoj = macs[mac].devices[devid].eoj;
-        deoj = [deoj.slice(0, 2), deoj.slice(2, 4), deoj.slice(-2)].map((e) => {
-            parseInt('0x'+e);
-        });
+        deoj = [deoj.slice(0, 2), deoj.slice(2, 4), deoj.slice(-2)].map((e) => parseInt('0x'+e));
 
         if (ip === IP_UNDEFINED || macs[mac].active !== true) {
             rj({error: `The IP address of ${devid} is currently unknown.`});
@@ -850,9 +845,7 @@ function onProcCallGet(method, devid, propname, args) {
                 if (cacheValue != undefined) {
                     cacheStr = ' Cache:' + cacheValue;
                 } else if (cacheEdt != undefined) {
-                    const s = cacheEdt.map((i) => {
-                        ('0'+i.toString(16)).slice(-2);
-                    }).join('');
+                    const s = cacheEdt.map((i) => ('0'+i.toString(16)).slice(-2)).join('');
                     cacheStr = ' Cache:0x' + s;
                 }
                 re[epcType].option = {

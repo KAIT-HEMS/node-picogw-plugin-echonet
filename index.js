@@ -30,6 +30,7 @@ let log = console.log;
 let localStorage;
 
 let macs = {};
+let macsObj = {};
 let mynet;
 function savemac() {
     localStorage.setItem('macs', macs);
@@ -38,12 +39,12 @@ function savemac() {
 /* macs entry format:
 key:macaddress
 value: {
-    ip : LAST_AVAILABLE_IP_ADDRESS
-    , active:true (at least one message is received since last boot.)|false (otherwise)
-    , nodeprofile : {
+    // ip : LAST_AVAILABLE_IP_ADDRESS, ('ip' and 'active' is now only in macsObj)
+    // active:true (at least one message is received since last boot.)|false (otherwise),
+    nodeprofile : {
          version: VERSION(0x82) , id: ID(0x83) ,date: PRODUCTION_DATE(0x8e / optional))
-    }
-    , devices :{
+    },
+    devices :{
         DEVICE_ID (etc. DomesticHomeAirConditioner_1) : {
               eoj : object identifier (eg. 0x013001)
             , active :  true (the device is registered to the controller)
@@ -56,8 +57,8 @@ value: {
             , propertymap : [] array of available properties
             , options : {} device specific information extracted from devices DB
         },
-    }
-    , eoj_id_map : {    // EOJ (eg.013001) to DEVICE_ID (eg. DomesticHomeAirConditioner_1) mapping
+    },
+    eoj_id_map : {    // EOJ (eg.013001) to DEVICE_ID (eg. DomesticHomeAirConditioner_1) mapping
         EOJ: DEVICE_ID,
     }
 }
@@ -99,7 +100,7 @@ function assert(bAssertion, msg) {
 
 let ELDB = {};
 
-const IP_UNDEFINED = '-';
+// const IP_UNDEFINED = '-';
 
 module.exports.init = init;
 async function init(_pluginInterface) {
@@ -206,7 +207,7 @@ async function init(_pluginInterface) {
         });
     }; // save nothing
 
-
+    /*
     function setIPAddressAsUnknown(ip) {
         if (ip == IP_UNDEFINED) return;
         for (const macinfo of Object.values(macs)) {
@@ -215,30 +216,33 @@ async function init(_pluginInterface) {
             // macinfo.active = false;
         }
     }
+*/
 
     pi.net.setCallbacks({
         onMacFoundCallback: function(net, newmac, newip) {
             log(`onMacFoundCallback("${net}","${newmac}","${newip}")`);
             assert(net == mynet, 'onMacFoundCallback');
+            /*
 
             setIPAddressAsUnknown(newip);
             // Really new MAC (if it is an ECHONET device, it will be discovered later.)
             if (macs[newmac] == null) return;
             macs[newmac].active = true;
             macs[newmac].ip = newip;
+            */
         },
         onMacLostCallback: function(net, lostmac, lostip) {
             log(`onMacLostCallback("${net}","${lostmac}","${lostip}")`);
             assert(net == mynet, 'onMacLostCallback');
-            setIPAddressAsUnknown(lostip);
+            /* setIPAddressAsUnknown(lostip);
             if (macs[lostmac] != null) {
                 macs[lostmac].active = false;
-            }
+            }*/
         },
         onIPChangedCallback: function(net, mac, oldip, newip) {
             log(`onIPChangedCallback("${net}","${mac}","${oldip}","${newip}")`);
             assert(net == mynet, 'onIPChangedCallback');
-            setIPAddressAsUnknown(newip);
+            /* setIPAddressAsUnknown(newip);
             assert(
                 macs[mac].ip == oldip,
                 'onIPChangedCallback : old ip ' + oldip + 'does not exist');
@@ -247,13 +251,13 @@ async function init(_pluginInterface) {
                 EL.EL_Multi,
                 [0x0e, 0xf0, 0x01], [0x0e, 0xf0, 0x01],
                 0x73, 0xd5, EL.Node_details['d5']);
+            */
         },
     });
 
-
-    return;
-
-
+    // ////////////////////////////////////////
+    // ////////////////////////////////////////
+    // ECHONET Lite setup
     const readJSON = (basename) => {
         const path = pathm.join(pi.getpath(), basename);
         return JSON.parse(fs.readFileSync(path, 'utf-8').toString());
@@ -318,7 +322,7 @@ async function init(_pluginInterface) {
     // Replace the original function
     // ネットワーク内のEL機器全体情報を更新する，受信したら勝手に実行される
     EL.renewFacilities = function(ip, els) {
-        // log(`getMACFromIPv4Address(${mynet},${ip})`);
+        // log(`ECHONET packet recv from ${ip}`);
         //        pi.getMACFromIPv4Address(mynet, ip, true).then((mac)=>{
         pi.net.registerIP(ip).then((regObj)=>{
             const mac = regObj.mac;
@@ -333,16 +337,16 @@ async function init(_pluginInterface) {
                 }
                 if (macs[mac] == undefined) {
                     macs[mac] = {
-                        ip: ip,
-                        active: true,
+                        /* ip: ip,
+                        active: true,*/
                         nodeprofile: {},
                         devices: {},
                         eoj_id_map: {},
                     };
                 } else {
-                    macs[mac].active = true;
+                    /* macs[mac].active = true;
                     setIPAddressAsUnknown(macs[mac].ip);
-                    macs[mac].ip = ip; // ip may be changed
+                    macs[mac].ip = ip; // ip may be changed*/
                 }
 
                 let mm = macs[mac];
@@ -351,8 +355,8 @@ async function init(_pluginInterface) {
                 function onDevFound(eoj) {
                     if (mm.eoj_id_map[eoj] != undefined) {
                         // Already defined device
-                        let dev = mm.devices[mm.eoj_id_map[eoj]];
-                        if (dev.active !== true) { // First time since last boot
+                        // let dev = mm.devices[mm.eoj_id_map[eoj]];
+                        if (macsObj[mac] == null) { // First time since last boot
                             registerExistingDevice(mm.eoj_id_map[eoj]);
                             EL.getPropertyMaps(ip, EL.toHexArray(eoj));
                             // log('Predefined device '+mm.eoj_id_map[els.SEOJ]+' replied') ;
@@ -374,6 +378,7 @@ async function init(_pluginInterface) {
                         registerExistingDevice(devid);
                         EL.getPropertyMaps(ip, EL.toHexArray(eoj));
                     }
+                    macsObj[mac] = regObj;
                 }
 
                 function instanceListProc(ilist) {
@@ -506,7 +511,7 @@ async function init(_pluginInterface) {
             }
         }).catch(()=>{
             // Do nothing
-            log('No MAC is found for ip '+ip);
+            // log('ECHONET Lite packet from other network (No MAC is found for '+ip);
         });
     };
 
@@ -566,12 +571,13 @@ function getPropVal(devid, epcHex) {
         localStorage.setItem('TransactionID', tid);
 
         const mac = getMacFromDeviceId(devid);
-        const ip = macs[mac].ip;
+        const ip = macsObj[mac].ip;
         let deoj = macs[mac].devices[devid].eoj;
         deoj = [deoj.slice(0, 2), deoj.slice(2, 4), deoj.slice(-2)]
             .map((e) => parseInt('0x'+e));
 
-        if (ip === IP_UNDEFINED || macs[mac].active !== true) {
+        if (ip === pluginInterface.net.INACTIVE
+        /* || macs[mac].active !== true*/) {
             rj({error: `The IP address of ${devid} is currently unknown.`});
             return;
         }
@@ -607,12 +613,13 @@ function setPropVal(devid, epcHex, edtArray) {
         localStorage.setItem('TransactionID', tid);
 
         const mac = getMacFromDeviceId(devid);
-        const ip = macs[mac].ip;
+        const ip = macsObj[mac].ip;
         let deoj = macs[mac].devices[devid].eoj;
         deoj = [deoj.slice(0, 2), deoj.slice(2, 4), deoj.slice(-2)]
             .map((e) => parseInt('0x'+e));
 
-        if (ip === IP_UNDEFINED || macs[mac].active !== true) {
+        if (ip === pluginInterface.net.INACTIVE
+        /* || macs[mac].active !== true*/) {
             rj({error: `The IP address of ${devid} is currently unknown.`});
             return;
         }
@@ -643,7 +650,7 @@ function setPropVal(devid, epcHex, edtArray) {
 
 function registerExistingDevice(devid) {
     let mac = getMacFromDeviceId(devid);
-    let ip = macs[mac].ip;
+    // let ip = macsObj[mac].ip;
     let dev = macs[mac].devices[devid];
 
     if (dev.active === true) {
@@ -653,7 +660,7 @@ function registerExistingDevice(devid) {
     dev.active = true;
     savemac();
 
-    log(`Device ${devid}:${ip} registered.`);
+    log(`Device ${devid}/${mac} registered.`);
 }
 
 function parseEDTs(els) {
@@ -770,7 +777,7 @@ function onProcCall(method, path /* _devid , propname*/, args) {
                     res[key]=_re[1];
                 });
                 acpt(res);
-            });
+            }).catch(rjct);
         });
     case 'PUT':
     case 'SET':
@@ -804,8 +811,8 @@ function onProcCallGet(method, devid, propname, args) {
             for (const [devid, dev] of Object.entries(macinfo.devices)) {
                 devices[devid]={
                     mac: mac,
-                    ip: macinfo.ip,
-                    active: dev.active,
+                    /* ip: macinfo.ip,
+                    active: dev.active,*/
                     eoj: dev.eoj,
                 };
 
@@ -1107,6 +1114,7 @@ function setNetwork(newnet) {
             exSet(cmds).then((re)=>{
                 pluginInterface.net.setNetworkInterface(newnet);
                 mynet = newnet;
+                EL.search();
                 acpt(re);
             }).catch(rjct);
         }).catch(rjct);

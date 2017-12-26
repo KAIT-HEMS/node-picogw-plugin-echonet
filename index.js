@@ -12,6 +12,7 @@ const RESPONSE_PREFIX = '/v1/echonet';
 let DEVICE_MULTICAST_INTITIAL_NUMBER = 4;
 const DEVICE_MULTICAST_INITIAL_INTERVAL = 15*1000;
 const DEVICE_MULTICAST_INTERVAL = 60*1000;
+const NMCLI_CONNECTION_NAME_PREFIX = 'picogw_conn'; // Should be the same as this in admin plugin
 
 /* // If you add 'makercode' entry to localstorage.json (as a number), the number is
 // loaded to this MAKER_CODE variable.
@@ -21,6 +22,7 @@ const fs = require('fs');
 const pathm = require('path');
 const EL = require('echonet-lite');
 const ProcConverter = require('./proc_converter.js');
+const sudo = require('./sudo.js');
 
 
 let pluginInterface;
@@ -116,6 +118,146 @@ async function init(_pluginInterface) {
             dev.active = false;
         }
     }
+
+    pi.setting.onUIGetSettingsSchema = function() {
+        return new Promise((ac, rj)=>{
+            try {
+                let nets = [];
+                let active_net;
+                const nets_hash = pi.net.getNetworkInterfaces();
+                for (let n in nets_hash) {
+		    if (!nets_hash.hasOwnProperty(n)) continue;
+		    if (nets_hash[n].active === true) {
+                        active_net = n;
+                    }
+		    nets.push(n);
+                }
+                ac({'title': 'ECHONET Lite Settings',
+		     'type': 'object',
+		     'properties': {
+                        'net': {
+			     'title': 'Network used for ECHONET Lite',
+			     'type': 'string',
+			     'enum': nets,
+                        },
+			 'root_passwd': {
+			     'title': 'Sudo password',
+			      'description': 'Necessary to change network interface',
+			      'type': 'string',
+			      'format': 'password',
+			 },
+                        //                        ,'81': {
+                        //			     'title': 'Installation Location',
+                        //			     'type': 'string',
+                        //			     'enum': [
+                        //                                 'unknown', 'living', 'dining', 'kitchen', 'bathroom', 'washroom', 'lavatory',
+                        //                                 'passage', 'room', 'stairway', 'entrance', 'closet', 'garden', 'parking',
+                        //                                 'balcony', 'others',
+                        //			     ],
+                        //                         }
+		     },
+		   });
+            } catch (e) {
+                ac({error: e.toString()});
+            }
+        });
+    };
+
+    pi.setting.onUIGetSettings = function(settings) {
+        return new Promise((ac, rj)=>{
+	    let retobj = {net: '', root_passwd: ''};
+            try {
+                const nets_hash = pi.net.getNetworkInterfaces();
+                for (let n in nets_hash) {
+		    if (!nets_hash.hasOwnProperty(n)) continue;
+		    if (nets_hash[n].active === true) {
+                        retobj.net = n;
+                        break;
+                    }
+                }
+                ac(retobj);
+	    } catch (e) {
+                ac({error: e.toString()});
+	    }
+        });
+    };
+
+    pi.setting.onUISetSettings = function(newSettings) {
+        const net = newSettings.net;
+        const rootPwd = newSettings.root_passwd;
+        newSettings.root_passwd = ''; // Root password is not saved to the file
+
+        if (net.length == 0) {
+            return Promise.resolve('No network is specified.');
+        }
+
+        if (rootPwd.length == 0) {
+            return Promise.reject('You have to specify root password to change active network!');
+        }
+
+        let myip;
+        try {
+	    myip = pi.net.getNetworkInterfaces()[net].ip;
+        } catch (e) {}
+        if (myip == null) {
+            return Promise.reject('No self IP address is found for network '+net);
+        }
+
+        return new Promise((acpt, rjct)=>{
+	    function exe(cmd) {
+                return new Promise((ac, rj)=>{
+		    let child = sudo(cmd, {password: rootPwd});
+		    child.stderr.on('data', (dat)=>{
+                        let msg = 'Error in executing\n$ ';
+                        msg += cmd.join(' ') + '\n\n' + dat.toString();
+                        rj(msg);
+		    });
+		    let retmsg = '';
+		    child.stdout.on('data', (dat)=>{
+                        retmsg += dat.toString();
+		    });
+		    child.stdout.on('close', ()=>{
+                        ac(retmsg);
+		    });
+                });
+	    }
+
+	    /*
+	    // Check if nmcli exists
+            exe(['nmcli', 'connection', 'show']).then((re2)=>{
+                let conn_name;
+                re2.split('\n').some((l)=>{
+                    l = l.split(/\s+/);
+		    if (l[l.length-1].length==0) l.pop();
+                    if (l.pop() !== net) return;
+                    conn_name = l.shift();
+                    return true;
+                });
+                if (conn_name == null) {
+                    rjct('No nmcli connection name is found for network interface "'+net+'"');
+                    return;
+                }
+	    */
+            exe(['nmcli', 'connection', 'modify', `${NMCLI_CONNECTION_NAME_PREFIX}_${net}` /* conn_name*/,
+		     'ipv4.method', 'manual',
+		     'ipv4.addresses', `${myip}/24`,
+		     '+ipv4.routes', `"224.0.23.0/32 ${myip}"`])
+                .then(acpt).catch((e)=>{
+		    rjct(e.toString()
+			 +'\nPossible causes:\n'
+			 +'1. nmcli is not installed.\n'
+			 +'2. Sudo password is wrong.\n'
+			 +`3. The network connection ${NMCLI_CONNECTION_NAME_PREFIX}_${net}`
+			 +' is not defined by admin plugin.'
+                    );
+                });
+            /*            }).catch((e)=>{
+                rjct(e.toString()+' / nmcli may not be installed.');
+	    });*/
+        });
+        //        return Promise.resolve(newSettings);
+    }; // save nothing
+
 
     function setIPAddressAsUnknown(ip) {
         if (ip == IP_UNDEFINED) return;

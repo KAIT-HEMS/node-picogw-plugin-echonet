@@ -23,7 +23,7 @@ const EL = require('echonet-lite');
 const ProcConverter = require('./proc_converter.js');
 
 
-let pluginInterface;
+let pi;
 let log = console.log;
 let localStorage;
 
@@ -100,9 +100,8 @@ let ELDB = {};
 const IP_UNDEFINED = '-';
 
 module.exports.init = init;
-async function init(_pluginInterface) {
-    pluginInterface = _pluginInterface;
-    const pi = pluginInterface;
+async function init(pluginInterface) {
+    pi = pluginInterface;
     log = pi.log;
 
     localStorage = pi.localStorage;
@@ -174,8 +173,8 @@ async function init(_pluginInterface) {
     log(JSON.stringify(pi.net.getNetworkInterfaces(), null, '\t'));
 
     const readJSON = (basename) => {
-        const path = pathm.join(pi.getpath(), basename);
-        return JSON.parse(fs.readFileSync(path, 'utf-8').toString());
+        const json = pi.pluginfs.readFileSync(basename, 'utf-8');
+        return JSON.parse(json.toString());
     };
 
     // Initialize echonet lite
@@ -232,7 +231,6 @@ async function init(_pluginInterface) {
             }
         }
     }
-    // fs.writeFileSync(pi.getpath()+'minimized.json',JSON.stringify(ELDB ,null,"\t")) ;
 
     // Replace the original function
     // ネットワーク内のEL機器全体情報を更新する，受信したら勝手に実行される
@@ -750,9 +748,8 @@ function onProcCallGet(method, devid, propname, args) {
         // Ideally, property map should be checked.
         let names;
         if (args.option === 'true') {
-            names = JSON.parse(fs.readFileSync(pathm.join(
-                pluginInterface.getpath(),
-                'all_'+LOCALE+'.json'), 'utf-8')).names;
+            const fname = 'all_' + LOCALE + '.json';
+            names = JSON.parse(pi.pluginfs.readFileSync(fname, 'utf-8')).names;
         }
 
         let re = {};

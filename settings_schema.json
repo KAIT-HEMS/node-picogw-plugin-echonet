@@ -1,1 +1,18 @@
-{}
+{
+	"title": "ECHONET Lite Settings"
+	,"type": "object"
+	,"properties":{
+		"net":{
+			"title": "Network used for ECHONET Lite"
+			,"type": "string"
+			,"enum": []
+			,"default": null
+		}
+		,"root_passwd": {
+			"title": "Sudo password"
+			,"description": "Necessary to change network setup"
+			,"type": "string"
+			,"format":"password"
+		}
+	}
+}

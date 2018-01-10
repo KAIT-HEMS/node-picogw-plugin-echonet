@@ -18,11 +18,8 @@ const DEVICE_MULTICAST_INTERVAL = 60*1000;
 // loaded to this MAKER_CODE variable.
 var MAKER_CODE = 0 ;*/
 
-const fs = require('fs');
-const pathm = require('path');
 const EL = require('echonet-lite');
 const ProcConverter = require('./proc_converter.js');
-const childProcess = require('child_process');
 
 
 let pi;
@@ -120,24 +117,16 @@ async function init(pluginInterface) {
     }
 
     // Setup self network
-    //   This should be specified through GUI in the future.
-    //    const myMACs = pi.getMACs(true);
     const nets = pi.net.getNetworkInterfaces();
-    let curnet;
-    for (const n in nets) {
-        if (curnet == null) curnet = n; // First one
-        if (nets[n].active) {
-            curnet = n;
+    for (const [n, nv] of Object.entries(nets)) {
+        if (mynet == null) mynet = n; // First one
+        if (nv.active) {
+            mynet = n;
             break;
         }
     }
-    if (curnet != null) {
-        setNetwork(curnet).then(log).catch(console.error);
-    } else {
-        console.error('No network is available!');
-    }
 
-    pi.setting.onUIGetSettingsSchema = function() {
+    pi.setting.onUIGetSettingsSchema = function(schema) {
         return new Promise((ac, rj)=>{
             try {
                 let nets = [];
@@ -150,27 +139,21 @@ async function init(pluginInterface) {
                     }
                     nets.push(n);
                 }
-                ac({'title': 'ECHONET Lite Settings',
-                    'type': 'object',
-                    'properties': {
-                        'net': {
-                            'title': 'Network used for ECHONET Lite',
-                            'type': 'string',
-                            'enum': nets,
-                            'default': activeNet,
-                        },
-                        /* '81': {
-                            'title': 'Installation Location',
-                            'type': 'string',
-                            'enum': [
-                                'unknown', 'living', 'dining', 'kitchen',
-                                'bathroom', 'washroom', 'lavatory', 'passage',
-                                'room', 'stairway', 'entrance', 'closet',
-                                'garden', 'parking', 'balcony', 'others',
-                            ],
-                        },*/
-                    },
-                });
+                schema.properties.net.enum = nets;
+                schema.properties.net.default = activeNet;
+                /*
+                schema.properties['81'] = {
+                    'title': 'Installation Location',
+                    'type': 'string',
+                    'enum': [
+                        'unknown', 'living', 'dining', 'kitchen',
+                        'bathroom', 'washroom', 'lavatory', 'passage',
+                        'room', 'stairway', 'entrance', 'closet',
+                        'garden', 'parking', 'balcony', 'others',
+                    ],
+                };
+                */
+                ac(schema);
             } catch (e) {
                 ac({error: e.toString()});
             }
@@ -196,15 +179,10 @@ async function init(pluginInterface) {
         });
     };
 
-    pi.setting.onUISetSettings = function(newSettings) {
-        return new Promise((ac, rj)=>{
-            setNetwork(newSettings.net).then(
-                (okmsg)=>{
-                    ac();
-                }
-            ).catch(rj);
-        });
-    }; // save nothing
+    pi.setting.onUISetSettings = async function(newSettings) {
+        await setNetwork(newSettings.net, newSettings.root_passwd);
+        return null; // save nothing
+    };
 
     /*
     function setIPAddressAsUnknown(ip) {
@@ -574,7 +552,7 @@ function getPropVal(devid, epcHex) {
         deoj = [deoj.slice(0, 2), deoj.slice(2, 4), deoj.slice(-2)]
             .map((e) => parseInt('0x'+e));
 
-        if (ip === pluginInterface.net.INACTIVE
+        if (ip === pi.net.INACTIVE
         /* || macs[mac].active !== true*/) {
             rj({error: `The IP address of ${devid} is currently unknown.`});
             return;
@@ -616,7 +594,7 @@ function setPropVal(devid, epcHex, edtArray) {
         deoj = [deoj.slice(0, 2), deoj.slice(2, 4), deoj.slice(-2)]
             .map((e) => parseInt('0x'+e));
 
-        if (ip === pluginInterface.net.INACTIVE
+        if (ip === pi.net.INACTIVE
         /* || macs[mac].active !== true*/) {
             rj({error: `The IP address of ${devid} is currently unknown.`});
             return;
@@ -1030,90 +1008,20 @@ function onProcCallPut(method, devid, propname, args) {
 // //////////////////////////////////////////////
 // //  Utility functions
 
-function setNetwork(newnet) {
-    if (newnet == mynet) {
-        return Promise.reject('The same network is specified:'+newnet);
-    }
-    const nets = pluginInterface.net.getNetworkInterfaces();
+async function setNetwork(newnet, password) {
+    const nets = pi.net.getNetworkInterfaces();
     if (nets[newnet] == null) {
-        return Promise.reject(newnet+' is not a valid network name');
+        throw new Error(newnet+' is not a valid network name');
     }
     const myip = nets[newnet].ip;
     if (myip == null) {
-        return Promise.reject(
+        throw new Error(
             'Network interface IP is not assigned to '+newnet);
     }
-    const prevIP = (mynet==null?null:nets[mynet].ip);
+    // const prevIP = (mynet==null?null:nets[mynet].ip);
 
-    return new Promise((acpt, rjct)=>{
-        function ex(cmd) {
-            return new Promise((ac, rj)=>{
-                let okMsg = '';
-                let erMsg='';
-                log('Exec:'+cmd.join(' '));
-                const child = childProcess.spawn(cmd[0], cmd.slice(1));
-                child.stdout.on('data', (dat)=>{
-                    okMsg += dat.toString();
-                });
-                child.stderr.on('data', (dat)=>{
-                    erMsg += dat.toString();
-                });
-                child.stdout.on('close', ()=>{
-                    if (erMsg.length==0) ac(okMsg);
-                    else {
-                        rj('Error in executing\n'
-                           +'$ '+cmd.join(' ')+'\n\n'
-                           + erMsg);
-                    }
-                });
-            });
-        }
-        function exSet(cmds) {
-            return new Promise((ac, rj)=>{
-                ex(cmds[0]).then((re)=>{
-                    if (cmds.length==1) ac(re);
-                    else exSet(cmds.slice(1)).then(ac).catch(rj);
-                }).catch(rj);
-            });
-        }
-
-        // Obtain nmcli connection name for newnet.
-        ex(['nmcli', 'connection', 'show']).then((connList)=>{
-            let connName;
-            let prevConnName;
-            connList.split('\n').forEach((l)=>{
-                l = l.split(/\s+/);
-                if (l[l.length-1].length==0) l.pop();
-                const devname = l.pop();
-                if (devname === newnet) connName = l.shift();
-                if (devname === mynet) prevConnName = l.shift();
-            });
-            if (connName == null) {
-                rjct('No nmcli connection name is found for network interface "'
-                     +newnet+'"');
-                return;
-            }
-            let cmds = [
-                ['nmcli', 'connection', 'modify', connName,
-                    '+ipv4.routes', '224.0.23.0/32 '+myip],
-                ['nmcli', 'connection', 'down', connName],
-                ['nmcli', 'connection', 'up', connName],
-            ];
-            if (prevConnName != null && prevIP != null) {
-                // Delete route from previous interface
-                cmds = [
-                    ['nmcli', 'connection', 'modify', prevConnName,
-                        '-ipv4.routes', '224.0.23.0/32 '+prevIP],
-                    ['nmcli', 'connection', 'down', prevConnName],
-                    ['nmcli', 'connection', 'up', prevConnName],
-                ].concat(cmds);
-            }
-            exSet(cmds).then((re)=>{
-                pluginInterface.net.setNetworkInterface(newnet);
-                mynet = newnet;
-                EL.search();
-                acpt(re);
-            }).catch(rjct);
-        }).catch(rjct);
-    });
+    await pi.net.routeSet('224.0.23.0/32', myip, password);
+    pi.net.setNetworkInterface(newnet);
+    mynet = newnet;
+    EL.search();
 }

@@ -126,38 +126,50 @@ async function init(pluginInterface) {
         }
     }
 
-    pi.setting.onUIGetSettingsSchema = function(schema) {
-        return new Promise((ac, rj)=>{
-            try {
-                let nets = [];
-                let activeNet;
-                const netsHash = pi.net.getNetworkInterfaces();
-                for (let n in netsHash) {
-                    if (!netsHash.hasOwnProperty(n)) continue;
-                    if (netsHash[n].active === true) {
-                        activeNet = n;
-                    }
-                    nets.push(n);
+    pi.setting.onUIGetSettingsSchema = async function(schema) {
+        if (!pi.net.supportedNetworkManager()) {
+            delete schema.properties.net;
+            delete schema.properties.root_passwd;
+
+            schema.properties.network_settings = {
+                type: 'object',
+                description:
+`nmcli should be installed to setup network configuration. Execute
+"$ sudo apt-get install network-manager"
+or
+"$ sudo yum install NetworkManager"`,
+            };
+            return schema;
+        }
+        try {
+            let nets = [];
+            let activeNet;
+            const netsHash = pi.net.getNetworkInterfaces();
+            for (let n in netsHash) {
+                if (!netsHash.hasOwnProperty(n)) continue;
+                if (netsHash[n].active === true) {
+                    activeNet = n;
                 }
-                schema.properties.net.enum = nets;
-                schema.properties.net.default = activeNet;
-                /*
-                schema.properties['81'] = {
-                    'title': 'Installation Location',
-                    'type': 'string',
-                    'enum': [
-                        'unknown', 'living', 'dining', 'kitchen',
-                        'bathroom', 'washroom', 'lavatory', 'passage',
-                        'room', 'stairway', 'entrance', 'closet',
-                        'garden', 'parking', 'balcony', 'others',
-                    ],
-                };
-                */
-                ac(schema);
-            } catch (e) {
-                ac({error: e.toString()});
+                nets.push(n);
             }
-        });
+            schema.properties.net.enum = nets;
+            schema.properties.net.default = activeNet;
+            /*
+            schema.properties['81'] = {
+                'title': 'Installation Location',
+                'type': 'string',
+                'enum': [
+                    'unknown', 'living', 'dining', 'kitchen',
+                    'bathroom', 'washroom', 'lavatory', 'passage',
+                    'room', 'stairway', 'entrance', 'closet',
+                    'garden', 'parking', 'balcony', 'others',
+                ],
+            };
+            */
+            return schema;
+        } catch (e) {
+            return {error: e.toString()};
+        }
     };
 
     pi.setting.onUIGetSettings = function(settings) {

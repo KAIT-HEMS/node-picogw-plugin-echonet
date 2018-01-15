@@ -28,7 +28,6 @@ let localStorage;
 
 let macs = {};
 let macsObj = {};
-let mynet;
 function savemac() {
     localStorage.setItem('macs', macs);
 }
@@ -116,16 +115,6 @@ async function init(pluginInterface) {
         }
     }
 
-    // Setup self network
-    const nets = pi.net.getNetworkInterfaces();
-    for (const [n, nv] of Object.entries(nets)) {
-        if (mynet == null) mynet = n; // First one
-        if (nv.active) {
-            mynet = n;
-            break;
-        }
-    }
-
     pi.setting.onUIGetSettingsSchema = async function(schema) {
         if (!pi.net.supportedNetworkManager()) {
             delete schema.properties.net;
@@ -210,7 +199,6 @@ or
     pi.net.setCallbacks({
         onMacFoundCallback: function(net, newmac, newip) {
             log(`onMacFoundCallback("${net}","${newmac}","${newip}")`);
-            assert(net == mynet, 'onMacFoundCallback');
             /*
 
             setIPAddressAsUnknown(newip);
@@ -222,7 +210,6 @@ or
         },
         onMacLostCallback: function(net, lostmac, lostip) {
             log(`onMacLostCallback("${net}","${lostmac}","${lostip}")`);
-            assert(net == mynet, 'onMacLostCallback');
             /* setIPAddressAsUnknown(lostip);
             if (macs[lostmac] != null) {
                 macs[lostmac].active = false;
@@ -230,7 +217,6 @@ or
         },
         onIPChangedCallback: function(net, mac, oldip, newip) {
             log(`onIPChangedCallback("${net}","${mac}","${oldip}","${newip}")`);
-            assert(net == mynet, 'onIPChangedCallback');
             /* setIPAddressAsUnknown(newip);
             assert(
                 macs[mac].ip == oldip,
@@ -1030,10 +1016,8 @@ async function setNetwork(newnet, password) {
         throw new Error(
             'Network interface IP is not assigned to '+newnet);
     }
-    // const prevIP = (mynet==null?null:nets[mynet].ip);
 
     await pi.net.routeSet('224.0.23.0/32', myip, password);
     pi.net.setNetworkInterface(newnet);
-    mynet = newnet;
     EL.search();
 }

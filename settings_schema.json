@@ -6,7 +6,7 @@
 			"title": "Network used for ECHONET Lite"
 			,"type": "string"
 			,"enum": []
-			,"default": null
+			,"required": true
 		}
 		,"root_passwd": {
 			"title": "Sudo password"

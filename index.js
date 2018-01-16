@@ -115,7 +115,21 @@ async function init(pluginInterface) {
         }
     }
 
-    pi.setting.onUIGetSettingsSchema = async function(schema) {
+
+    pi.setting.onUIGetSettings = function(settings) {
+        settings = settings || {};
+        settings.net = settings.net || '(none)';
+        const netsHash = pi.net.getNetworkInterfaces();
+        for (let n of Object.keys(netsHash)) {
+            if (netsHash[n].active === true) {
+                settings.net = n;
+                break;
+            }
+        }
+        return settings;
+    };
+
+    pi.setting.onUIGetSettingsSchema = async function(schema, settings) {
         if (!pi.net.supportedNetworkManager()) {
             delete schema.properties.net;
             delete schema.properties.root_passwd;
@@ -131,18 +145,12 @@ or
             return schema;
         }
         try {
-            let nets = [];
-            let activeNet;
+            const nets = ['(none)'];
             const netsHash = pi.net.getNetworkInterfaces();
-            for (let n in netsHash) {
-                if (!netsHash.hasOwnProperty(n)) continue;
-                if (netsHash[n].active === true) {
-                    activeNet = n;
-                }
+            for (let n of Object.keys(netsHash)) {
                 nets.push(n);
             }
             schema.properties.net.enum = nets;
-            schema.properties.net.default = activeNet;
             /*
             schema.properties['81'] = {
                 'title': 'Installation Location',
@@ -159,25 +167,6 @@ or
         } catch (e) {
             return {error: e.toString()};
         }
-    };
-
-    pi.setting.onUIGetSettings = function(settings) {
-        return new Promise((ac, rj)=>{
-            let retobj = {net: ''};
-            try {
-                const netsHash = pi.net.getNetworkInterfaces();
-                for (let n in netsHash) {
-                    if (!netsHash.hasOwnProperty(n)) continue;
-                    if (netsHash[n].active === true) {
-                        retobj.net = n;
-                        break;
-                    }
-                }
-                ac(retobj);
-            } catch (e) {
-                ac({error: e.toString()});
-            }
-        });
     };
 
     pi.setting.onUISetSettings = async function(newSettings) {
@@ -1008,16 +997,18 @@ function onProcCallPut(method, devid, propname, args) {
 
 async function setNetwork(newnet, password) {
     const nets = pi.net.getNetworkInterfaces();
-    if (nets[newnet] == null) {
-        throw new Error(newnet+' is not a valid network name');
-    }
-    const myip = nets[newnet].ip;
-    if (myip == null) {
-        throw new Error(
-            'Network interface IP is not assigned to '+newnet);
+    if (newnet && nets[newnet]) {
+        const myip = nets[newnet].ip;
+        if (myip == null) {
+            throw new Error(
+                'Network interface IP is not assigned to '+newnet);
+        }
+        await pi.net.routeSet('224.0.23.0/32', myip, password);
+    } else {
+        newnet = null;
+        await pi.net.routeDelete('224.0.23.0/32', password);
     }
 
-    await pi.net.routeSet('224.0.23.0/32', myip, password);
     pi.net.setNetworkInterface(newnet);
     EL.search();
 }

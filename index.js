@@ -98,7 +98,13 @@ let ELDB = {};
 
 // const IP_UNDEFINED = '-';
 
-module.exports.init = init;
+module.exports = {
+    init: init,
+    onCall: onProcCall,
+    onUIGetSettings: onUIGetSettings,
+    onUIGetSettingsSchema: onUIGetSettingsSchema,
+    onUISetSettings: onUISetSettings,
+};
 async function init(pluginInterface) {
     pi = pluginInterface;
     log = pi.log;
@@ -115,64 +121,6 @@ async function init(pluginInterface) {
         }
     }
 
-
-    pi.setting.onUIGetSettings = function(settings) {
-        settings = settings || {};
-        settings.net = settings.net || '(none)';
-        const netsHash = pi.net.getNetworkInterfaces();
-        for (let n of Object.keys(netsHash)) {
-            if (netsHash[n].active === true) {
-                settings.net = n;
-                break;
-            }
-        }
-        return settings;
-    };
-
-    pi.setting.onUIGetSettingsSchema = async function(schema, settings) {
-        if (!pi.net.supportedNetworkManager()) {
-            delete schema.properties.net;
-            delete schema.properties.root_passwd;
-
-            schema.properties.network_settings = {
-                type: 'object',
-                description:
-`nmcli should be installed to setup network configuration. Execute
-"$ sudo apt-get install network-manager"
-or
-"$ sudo yum install NetworkManager"`,
-            };
-            return schema;
-        }
-        try {
-            const nets = ['(none)'];
-            const netsHash = pi.net.getNetworkInterfaces();
-            for (let n of Object.keys(netsHash)) {
-                nets.push(n);
-            }
-            schema.properties.net.enum = nets;
-            /*
-            schema.properties['81'] = {
-                'title': 'Installation Location',
-                'type': 'string',
-                'enum': [
-                    'unknown', 'living', 'dining', 'kitchen',
-                    'bathroom', 'washroom', 'lavatory', 'passage',
-                    'room', 'stairway', 'entrance', 'closet',
-                    'garden', 'parking', 'balcony', 'others',
-                ],
-            };
-            */
-            return schema;
-        } catch (e) {
-            return {error: e.toString()};
-        }
-    };
-
-    pi.setting.onUISetSettings = async function(newSettings) {
-        await setNetwork(newSettings.net, newSettings.root_passwd);
-        return null; // save nothing
-    };
 
     /*
     function setIPAddressAsUnknown(ip) {
@@ -698,7 +646,6 @@ function sendFrame(ip, tid, seoj, deoj, esv, properties) {
 // /
 
 
-module.exports.onCall = onProcCall;
 function onProcCall(method, path /* _devid , propname*/, args) {
     const pathSplit = path.split('/');
     const _devid = pathSplit.shift();
@@ -989,6 +936,71 @@ function onProcCallPut(method, devid, propname, args) {
 
     return setPropVal(devid, epcHex, args.edt);
 }
+
+
+// /////////////////////////////////////////////////////
+// /////////////////////////////////////////////////////
+// /
+// /           Settings
+// /
+
+function onUIGetSettings(settings) {
+    settings = settings || {};
+    settings.net = settings.net || '(none)';
+    const netsHash = pi.net.getNetworkInterfaces();
+    for (let n of Object.keys(netsHash)) {
+        if (netsHash[n].active === true) {
+            settings.net = n;
+            break;
+        }
+    }
+    return settings;
+};
+
+async function onUIGetSettingsSchema(schema, settings) {
+    if (!pi.net.supportedNetworkManager()) {
+        delete schema.properties.net;
+        delete schema.properties.root_passwd;
+
+        schema.properties.network_settings = {
+            type: 'object',
+            description:
+`nmcli should be installed to setup network configuration. Execute
+"$ sudo apt-get install network-manager"
+or
+"$ sudo yum install NetworkManager"`,
+        };
+        return schema;
+    }
+    try {
+        const nets = ['(none)'];
+        const netsHash = pi.net.getNetworkInterfaces();
+        for (let n of Object.keys(netsHash)) {
+            nets.push(n);
+        }
+        schema.properties.net.enum = nets;
+        /*
+        schema.properties['81'] = {
+            'title': 'Installation Location',
+            'type': 'string',
+            'enum': [
+                'unknown', 'living', 'dining', 'kitchen',
+                'bathroom', 'washroom', 'lavatory', 'passage',
+                'room', 'stairway', 'entrance', 'closet',
+                'garden', 'parking', 'balcony', 'others',
+            ],
+        };
+        */
+        return schema;
+    } catch (e) {
+        return {error: e.toString()};
+    }
+};
+
+async function onUISetSettings(newSettings) {
+    await setNetwork(newSettings.net, newSettings.root_passwd);
+    return null; // save nothing
+};
 
 
 // //////////////////////////////////////////////

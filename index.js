@@ -998,12 +998,7 @@ function onProcCallPut(method, devid, propname, args) {
 async function setNetwork(newnet, password) {
     const nets = pi.net.getNetworkInterfaces();
     if (newnet && nets[newnet]) {
-        const myip = nets[newnet].ip;
-        if (myip == null) {
-            throw new Error(
-                'Network interface IP is not assigned to '+newnet);
-        }
-        await pi.net.routeSet('224.0.23.0/32', myip, password);
+        await pi.net.routeSet('224.0.23.0/32', newnet, password);
     } else {
         newnet = null;
         await pi.net.routeDelete('224.0.23.0/32', password);

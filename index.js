@@ -150,7 +150,11 @@ async function init(pluginInterface) {
             /* setIPAddressAsUnknown(lostip);
             if (macs[lostmac] != null) {
                 macs[lostmac].active = false;
-            }*/
+                }*/
+            for (const devName in macs[lostmac].devices) {
+                if (!macs[lostmac].devices.hasOwnProperty(devName)) continue;
+                macs[lostmac].devices[devName].active = false;
+            }
         },
         onIPChangedCallback: function(net, mac, oldip, newip) {
             log(`onIPChangedCallback("${net}","${mac}","${oldip}","${newip}")`);
@@ -266,11 +270,17 @@ async function init(pluginInterface) {
                 function onDevFound(eoj) {
                     if (mm.eoj_id_map[eoj] != undefined) {
                         // Already defined device
-                        // let dev = mm.devices[mm.eoj_id_map[eoj]];
                         if (macsObj[mac] == null) { // First time since last boot
                             registerExistingDevice(mm.eoj_id_map[eoj]);
                             EL.getPropertyMaps(ip, EL.toHexArray(eoj));
                             // log('Predefined device '+mm.eoj_id_map[els.SEOJ]+' replied') ;
+                        } else {
+                            // Activate device
+                            const dev = mm.devices[mm.eoj_id_map[eoj]];
+                            if (!dev.active) {
+                                dev.active = true;
+                                savemac();
+                            }
                         }
                     } else if (ELDB[eoj.slice(0, 4)] == undefined) {
                         log(`EOJ ${eoj} on ${ip} is not found in ECHONET Lite DB.`); // eslint-disable-line max-len
@@ -721,8 +731,8 @@ function onProcCallGet(method, devid, propname, args) {
             for (const [devid, dev] of Object.entries(macinfo.devices)) {
                 devices[devid]={
                     mac: mac,
-                    /* ip: macinfo.ip,
-                    active: dev.active,*/
+                    /* ip: macinfo.ip,*/
+                    active: dev.active,
                     eoj: dev.eoj,
                 };
 

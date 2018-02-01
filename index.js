@@ -151,6 +151,7 @@ async function init(pluginInterface) {
             if (macs[lostmac] != null) {
                 macs[lostmac].active = false;
                 }*/
+            if (!macs[lostmac]) return;
             for (const devName in macs[lostmac].devices) {
                 if (!macs[lostmac].devices.hasOwnProperty(devName)) continue;
                 macs[lostmac].devices[devName].active = false;

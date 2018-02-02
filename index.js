@@ -386,7 +386,7 @@ async function init(pluginInterface) {
                             edt: edt,
                             value: (edtConvFunc && edtConvFunc(edt)),
                         };
-                        pi.publish(
+                        pi.server.publish(
                             mm.eoj_id_map[els.SEOJ] + '/' + epcType,
                             data);
                     }

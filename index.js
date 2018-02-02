@@ -731,6 +731,7 @@ function onProcCallGet(method, devid, propname, args) {
         for (const [mac, macinfo] of Object.entries(macs)) {
             for (const [devid, dev] of Object.entries(macinfo.devices)) {
                 const mo = macsObj[mac];
+                const ip = (mo==null?null:mo.ip);
                 devices[devid]={
                     mac: mac,
                     /* ip: macinfo.ip,*/
@@ -741,7 +742,7 @@ function onProcCallGet(method, devid, propname, args) {
                 if (args.option === 'true') {
                     devices[devid].option = {
                         doc: {
-                            short: `EOJ:${dev.eoj} IP:${mo.ip} MAC:${mac}`,
+                            short: `EOJ:${dev.eoj} IP:${ip} MAC:${mac}`,
                         },
                         leaf: false,
                     };

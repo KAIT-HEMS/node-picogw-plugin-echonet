@@ -692,7 +692,7 @@ function onProcCall(method, path /* _devid , propname*/, args) {
                         ac([devid, err]);
                     });
             }))).then((re)=>{
-                let res = {};
+                let res = {leaf: true};
                 re.forEach((_re)=>{
                     let key = `${RESPONSE_PREFIX}/${_re[0]}/${propname}`;
                     res[key]=_re[1];
@@ -711,7 +711,7 @@ function onProcCall(method, path /* _devid , propname*/, args) {
                         ac([devid, err]);
                     });
             }))).then((re)=>{
-                let res = {};
+                let res = {leaf: true};
                 re.forEach((_re)=>{
                     let key = `${RESPONSE_PREFIX}/${_re[0]}/${propname}`;
                     res[key]=_re[1];

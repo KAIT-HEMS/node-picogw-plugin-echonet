@@ -419,8 +419,11 @@ async function init(pluginInterface) {
                         delete procCallWaitList[els.TID];
                     } else if (els.ESV == '51' || els.ESV == '52') { // cannot reply
                         procCallWaitList[els.TID]({
-                            error: 'Cannot complete the request.',
-                            els: els,
+                            errors: [
+                                {message: 'Cannot complete the request.',
+                                    els: els,
+                                },
+                            ],
                         });
                         delete procCallWaitList[els.TID];
                     }
@@ -500,7 +503,7 @@ function getPropVal(devid, epcHex) {
 
         if (ip === pi.net.INACTIVE
         /* || macs[mac].active !== true*/) {
-            rj({error: `The IP address of ${devid} is currently unknown.`});
+            rj({errors: [{message: `The IP address of ${devid} is currently unknown.`}]});
             return;
         }
 
@@ -521,7 +524,7 @@ function getPropVal(devid, epcHex) {
         setTimeout(()=>{
             if (procCallWaitList[tidKey] == ac) {
                 delete procCallWaitList[tidKey];
-                rj({error: `GET request timeout:${devid}/${epcHex}`});
+                rj({errors: [{message: `GET request timeout:${devid}/${epcHex}`}]});
             }
         }, GET_TIMEOUT);
     });
@@ -542,7 +545,7 @@ function setPropVal(devid, epcHex, edtArray) {
 
         if (ip === pi.net.INACTIVE
         /* || macs[mac].active !== true*/) {
-            rj({error: `The IP address of ${devid} is currently unknown.`});
+            rj({errors: [{message: `The IP address of ${devid} is currently unknown.`}]});
             return;
         }
 
@@ -564,7 +567,9 @@ function setPropVal(devid, epcHex, edtArray) {
         setTimeout(()=>{
             if (procCallWaitList[tidKey] == ac) {
                 delete procCallWaitList[tidKey];
-                rj({error: `PUT request timeout:${devid}/${epcHex}=>${JSON.stringify(edtArray)}`}); // eslint-disable-line max-len
+                rj({errors: [{
+                    message: `PUT request timeout:${devid}/${epcHex}=>${JSON.stringify(edtArray)}`,
+                }]}); // eslint-disable-line max-len
             }
         }, GET_TIMEOUT);
     });
@@ -677,7 +682,9 @@ function onProcCall(method, path /* _devid , propname*/, args) {
         case 'SET':
             return onProcCallPut(method, _devid, propname, args);
         }
-        return {error: `The specified method ${method} is not implemented in echonet lite plugin.`}; // eslint-disable-line max-len
+        return {errors: [{
+            message: `The specified method ${method} is not implemented in echonet lite plugin.`,
+        }]}; // eslint-disable-line max-len
     }
     let devids = expandDeviceIdFromPossiblyRegExpDeviceId(
         decodeURIComponent(_devid));
@@ -721,7 +728,9 @@ function onProcCall(method, path /* _devid , propname*/, args) {
         });
         // return onProcCallPut( method , devid , propname , args ) ;
     }
-    return {error: `The specified method ${method} is not implemented in echonet lite plugin.`}; // eslint-disable-line max-len
+    return {errors: [{
+        message: `The specified method ${method} is not implemented in echonet lite plugin.`,
+    }]}; // eslint-disable-line max-len
 }
 
 function onProcCallGet(method, devid, propname, args) {
@@ -753,7 +762,7 @@ function onProcCallGet(method, devid, propname, args) {
     }
 
     const mac = getMacFromDeviceId(devid);
-    if (mac == undefined) return {error: 'No such device:'+devid};
+    if (mac == undefined) return {errors: [{message: 'No such device:'+devid}]};
     const dev = macs[mac].devices[devid];
     const eoj = dev.eoj.substring(0, 4);
     if (propname == '') { // access 'echonet/devid/' => property list
@@ -890,7 +899,7 @@ function onProcCallGet(method, devid, propname, args) {
             epcHex = propname.toLowerCase();
         } else if (!isNaN(parseInt(propname))) {
             epcHex = ('0'+(parseInt(propname)&0xff).toString(16)).slice(-2);
-        } else return {error: 'Unknown property name:'+propname};
+        } else return {errors: [{message: 'Unknown property name:'+propname}]};
     }
 
     return getPropVal(devid, epcHex);
@@ -899,11 +908,14 @@ function onProcCallGet(method, devid, propname, args) {
 function onProcCallPut(method, devid, propname, args) {
     if (devid == '' || propname == '' || args==undefined ||
         (args.value==undefined && args.edt == undefined)) {
-        return {error: `Device id, property name, and the argument "value" or "edt" must be provided for ${method} method.`}; // eslint-disable-line max-len
+        return {errors: [{
+            message: 'Device id, property name, and the argument "value"'
+                +` or "edt" must be provided for ${method} method.`,
+        }]}; // eslint-disable-line max-len
     }
 
     let mac = getMacFromDeviceId(devid);
-    if (mac == undefined) return {error: 'No such device:'+devid};
+    if (mac == undefined) return {errors: [{message: 'No such device:'+devid}]};
 
     let epcHex = undefined;
     let edtConvFunc = undefined;
@@ -920,7 +932,7 @@ function onProcCallPut(method, devid, propname, args) {
             epcHex = propname.toLowerCase();
         } else if (!isNaN(parseInt(propname))) {
             epcHex = ('0'+(parseInt(propname)&0xff).toString(16)).slice(-2);
-        } else return {error: 'Unknown property name:'+propname};
+        } else return {errors: [{message: 'Unknown property name:'+propname}]};
     }
 
     if (epcs[epcHex] != undefined && epcs[epcHex].edtConvFuncs != undefined) {
@@ -934,14 +946,14 @@ function onProcCallPut(method, devid, propname, args) {
     if (args.edt != null) {
         if (! (args.edt instanceof Array)) {
             if (isNaN(args.edt) || !isFinite(args.edt)) {
-                return {error: 'edt is not a number nor number array'};
+                return {errors: [{message: 'edt is not a number nor number array'}]};
             }
             args.edt = [args.edt];
         }
     } else if (edtConvFunc != undefined) {
         args.edt = edtConvFunc(args.value);
     } else {
-        return {error: 'No converter to generate edt from value.'};
+        return {errors: [{message: 'No converter to generate edt from value.'}]};
     }
 
     return setPropVal(devid, epcHex, args.edt);
@@ -1003,7 +1015,7 @@ or
         */
         return schema;
     } catch (e) {
-        return {error: e.toString()};
+        return {errors: [{message: e.toString()}]};
     }
 };
 

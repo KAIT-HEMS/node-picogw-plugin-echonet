@@ -35,19 +35,13 @@ function savemac(mac) {
         localStorage.setItem('mac_'+mac_sj, macs[_mac]);
     }
 
-    let macsIndex = {};
-    if (mac == null) { // Save all macs and index
+    if (mac == null) { // Save all macs
         for (const _mac in macs) {
-            macsIndex[_mac] = {};
             saveOneMac(_mac);
         }
-    } else { // Save specified mac and index
+    } else {
         saveOneMac(mac);
-        for (const _mac in macs) {
-            macsIndex[_mac] = {};
-        }
     }
-    localStorage.setItem('macsIndex', macsIndex);
 }
 
 function loadmac(mac) {
@@ -59,46 +53,30 @@ function loadmac(mac) {
         }
     }
 
-    let macsIndex = localStorage.getItem('macsIndex', {});
-
     if (mac == null) {
-        macs = macsIndex;
-        for (const _mac in macsIndex) {
-            loadOneMac(_mac);
+        macs = {};
+        for (let k in localStorage.getKeys()) {
+            if (k.indexOf('mac_')!=0) continue;
+            mac = k.split('_').slice(1).join(':');
+            loadOneMac(mac);
         }
     } else {
         loadOneMac(mac);
     }
 }
 
-function deletemac(mac) {
-    function saveOneMac(_mac) {
-        const mac_sj = _mac.split(':').join('_');
-        localStorage.setItem('mac_'+mac_sj, macs[_mac]);
-    }
-
-    if (mac == null) {
-        for (const _mac in macs) {
-            const mac_sj = _mac.split(':').join('_');
-            localStorage.removeItem('mac_'+mac_sj);
-        }
-        localStorage.setItem('macsIndex', {});
-        return {success: true, message: 'All MAC address info deleted'};
-    }
-
-    if (macs[mac] == null) {
-        return {errors: [{message: `Deleting mac ${mac} not found.`}]};
-    }
-    const mac_sj = mac.split(':').join('_');
-    localStorage.removeItem('mac_'+mac_sj);
-
-    delete macs[mac];
-    let macsIndex = {};
+function deleteallmac(mac) {
     for (const _mac in macs) {
-        macsIndex[_mac] = {};
+        const mac_sj = _mac.split(':').join('_');
+        localStorage.removeItem('mac_'+mac_sj);
     }
-
-    localStorage.setItem('macsIndex', macsIndex);
+    for (let k in localStorage.getKeys()) {
+        if (k.slice(-'_Count'.length)=='_Count') {
+            localStorage.removeItem(k);
+        }
+    }
+    macs = {};
+    return {success: true, message: 'All MAC address info deleted'};
 }
 
 
@@ -769,9 +747,11 @@ function onProcCall(method, path /* _devid , propname*/, args) {
         decodeURIComponent(_devid));
     switch (method) {
     case 'GET':
+    case 'DELETE':
         return new Promise((acpt, rjct)=>{
+            const onProcCall = (method=='GET'?onProcCallGet:onProcCallDelete);
             Promise.all(devids.map((devid)=>new Promise((ac, rj)=>{
-                Promise.all([onProcCallGet(method, devid, propname, args)])
+                Promise.all([onProcCall(method, devid, propname, args)])
                     .then((re)=>{
                         ac([devid, re[0]]);
                     }).catch((err)=>{
@@ -810,33 +790,6 @@ function onProcCall(method, path /* _devid , propname*/, args) {
     return {errors: [{
         message: `The specified method ${method} is not implemented in echonet lite plugin.`,
     }]}; // eslint-disable-line max-len
-}
-
-function onProcCallDelete(method, devid, propname, args) {
-    if (devid == '') {
-        return deletemac();
-    }
-    if (propname == '') {
-        let mac = getMacFromDeviceId(devid);
-        if (mac == null) {
-            return {errors: [{message: 'No mac found for '+devid}]};
-        }
-
-        delete macs[mac].devices[devid];
-
-        for (const eoj in macs[mac].eoj_id_map) {
-            if (macs[mac].eoj_id_map[eoj] == devid) {
-                delete macs[mac].eoj_id_map[eoj];
-                break;
-            }
-        }
-
-        savemac(mac);
-
-        return {success: true, message: 'device '+devid+' successfully deleted.'};
-    }
-
-    return {message: 'implementing deleting a property.'};
 }
 
 function onProcCallGet(method, devid, propname, args) {
@@ -1063,6 +1016,58 @@ function onProcCallPut(method, devid, propname, args) {
     }
 
     return setPropVal(devid, epcHex, args.edt);
+}
+
+function onProcCallDelete(method, devid, propname, args) {
+    if (devid == '') {
+        return deleteallmac();
+    }
+    let mac = getMacFromDeviceId(devid);
+    if (mac == null) {
+        return {errors: [{message: 'No mac found for '+devid}]};
+    }
+    let eoj;
+    for (const _eoj in macs[mac].eoj_id_map) {
+        if (macs[mac].eoj_id_map[_eoj] == devid) {
+            eoj = _eoj;
+            break;
+        }
+    }
+
+    if (propname == '') {
+        delete macs[mac].devices[devid];
+
+        if (eoj) {
+            delete macs[mac].eoj_id_map[eoj];
+        }
+
+        savemac(mac);
+
+        return {success: true, message: 'device '+devid+' successfully deleted.'};
+    }
+
+    const epcs = ELDB[eoj.slice(0, 4)].epcs;
+    let epcHex;
+    for (const epc of Object.keys(epcs)) {
+        if (propname === epcs[epc].epcType) {
+            epcHex = epc;
+            break;
+        }
+    }
+
+
+    // const epcHex = macs[mac].devices[devid][propname]
+    delete macs[mac].devices[devid][propname];
+    savemac(mac);
+
+    getPropVal(devid, epcHex);
+
+    const key = `${RESPONSE_PREFIX}/${devid}/${propname}`;
+    let ret = {};
+    ret[key] = {success: true,
+        message: `${devid}/${propname} successfully deleted.`,
+    };
+    return ret;
 }
 
 

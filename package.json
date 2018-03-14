@@ -1,6 +1,6 @@
 {
   "name": "picogw-plugin-echonet",
-  "version": "0.0.10",
+  "version": "0.0.11",
   "description": "ECHONET plugin of picogw",
   "main": "index.js",
   "scripts": {

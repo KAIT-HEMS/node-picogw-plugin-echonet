@@ -31,8 +31,8 @@ let macsObj = {};
 
 function savemac(mac) {
     function saveOneMac(_mac) {
-        const mac_sj = _mac.split(':').join('_');
-        localStorage.setItem('mac_'+mac_sj, macs[_mac]);
+        const macsj = _mac.split(':').join('_');
+        localStorage.setItem('mac_'+macsj, macs[_mac]);
     }
 
     if (mac == null) { // Save all macs
@@ -46,8 +46,8 @@ function savemac(mac) {
 
 function loadmac(mac) {
     function loadOneMac(_mac) {
-        const mac_sj = _mac.split(':').join('_');
-        macs[_mac] = localStorage.getItem('mac_'+mac_sj, null);
+        const macsj = _mac.split(':').join('_');
+        macs[_mac] = localStorage.getItem('mac_'+macsj, null);
         if (macs[_mac] == null) {
             macs[_mac] = {active: false, devices: {}, eoj_id_map: {}, nodeprofile: {}};
         }
@@ -67,8 +67,8 @@ function loadmac(mac) {
 
 function deleteallmac(mac) {
     for (const _mac in macs) {
-        const mac_sj = _mac.split(':').join('_');
-        localStorage.removeItem('mac_'+mac_sj);
+        const macsj = _mac.split(':').join('_');
+        localStorage.removeItem('mac_'+macsj);
     }
     for (let k in localStorage.getKeys()) {
         if (k.slice(-'_Count'.length)=='_Count') {
@@ -1020,6 +1020,7 @@ function onProcCallPut(method, devid, propname, args) {
 
 function onProcCallDelete(method, devid, propname, args) {
     if (devid == '') {
+        EL.search();
         return deleteallmac();
     }
     let mac = getMacFromDeviceId(devid);
@@ -1043,6 +1044,7 @@ function onProcCallDelete(method, devid, propname, args) {
 
         savemac(mac);
 
+        EL.search();
         return {success: true, message: 'device '+devid+' successfully deleted.'};
     }
 

@@ -71,6 +71,37 @@ function loadmac(mac) {
     }
 }
 
+function deletemac(mac) {
+    function saveOneMac(_mac) {
+        const mac_sj = _mac.split(':').join('_');
+        localStorage.setItem('mac_'+mac_sj, macs[_mac]);
+    }
+
+    if (mac == null) {
+        for (const _mac in macs) {
+            const mac_sj = _mac.split(':').join('_');
+            localStorage.removeItem('mac_'+mac_sj);
+        }
+        localStorage.setItem('macsIndex', {});
+        return {success: true, message: 'All MAC address info deleted'};
+    }
+
+    if (macs[mac] == null) {
+        return {errors: [{message: `Deleting mac ${mac} not found.`}]};
+    }
+    const mac_sj = mac.split(':').join('_');
+    localStorage.removeItem('mac_'+mac_sj);
+
+    delete macs[mac];
+    let macsIndex = {};
+    for (const _mac in macs) {
+        macsIndex[_mac] = {};
+    }
+
+    localStorage.setItem('macsIndex', macsIndex);
+}
+
+
 /* macs entry format:
 key:macaddress
 value: {
@@ -727,6 +758,8 @@ function onProcCall(method, path /* _devid , propname*/, args) {
         case 'PUT':
         case 'SET':
             return onProcCallPut(method, _devid, propname, args);
+        case 'DELETE':
+            return onProcCallDelete(method, _devid, propname, args);
         }
         return {errors: [{
             message: `The specified method ${method} is not implemented in echonet lite plugin.`,
@@ -777,6 +810,33 @@ function onProcCall(method, path /* _devid , propname*/, args) {
     return {errors: [{
         message: `The specified method ${method} is not implemented in echonet lite plugin.`,
     }]}; // eslint-disable-line max-len
+}
+
+function onProcCallDelete(method, devid, propname, args) {
+    if (devid == '') {
+        return deletemac();
+    }
+    if (propname == '') {
+        let mac = getMacFromDeviceId(devid);
+        if (mac == null) {
+            return {errors: [{message: 'No mac found for '+devid}]};
+        }
+
+        delete macs[mac].devices[devid];
+
+        for (const eoj in macs[mac].eoj_id_map) {
+            if (macs[mac].eoj_id_map[eoj] == devid) {
+                delete macs[mac].eoj_id_map[eoj];
+                break;
+            }
+        }
+
+        savemac(mac);
+
+        return {success: true, message: 'device '+devid+' successfully deleted.'};
+    }
+
+    return {message: 'implementing deleting a property.'};
 }
 
 function onProcCallGet(method, devid, propname, args) {

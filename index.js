@@ -28,8 +28,47 @@ let localStorage;
 
 let macs = {};
 let macsObj = {};
-function savemac() {
-    localStorage.setItem('macs', macs);
+
+function savemac(mac) {
+    function saveOneMac(_mac) {
+        const mac_sj = _mac.split(':').join('_');
+        localStorage.setItem('mac_'+mac_sj, macs[_mac]);
+    }
+
+    let macsIndex = {};
+    if (mac == null) { // Save all macs and index
+        for (const _mac in macs) {
+            macsIndex[_mac] = {};
+            saveOneMac(_mac);
+        }
+    } else { // Save specified mac and index
+        saveOneMac(mac);
+        for (const _mac in macs) {
+            macsIndex[_mac] = {};
+        }
+    }
+    localStorage.setItem('macsIndex', macsIndex);
+}
+
+function loadmac(mac) {
+    function loadOneMac(_mac) {
+        const mac_sj = _mac.split(':').join('_');
+        macs[_mac] = localStorage.getItem('mac_'+mac_sj, null);
+        if (macs[_mac] == null) {
+            macs[_mac] = {active: false, devices: {}, eoj_id_map: {}, nodeprofile: {}};
+        }
+    }
+
+    let macsIndex = localStorage.getItem('macsIndex', {});
+
+    if (mac == null) {
+        macs = macsIndex;
+        for (const _mac in macsIndex) {
+            loadOneMac(_mac);
+        }
+    } else {
+        loadOneMac(mac);
+    }
 }
 
 /* macs entry format:
@@ -105,12 +144,13 @@ module.exports = {
     onUIGetSettingsSchema: onUIGetSettingsSchema,
     onUISetSettings: onUISetSettings,
 };
+
 async function init(pluginInterface) {
     pi = pluginInterface;
     log = pi.log;
 
     localStorage = pi.localStorage;
-    macs = localStorage.getItem('macs', {});
+    loadmac();
     // MAKER_CODE = localStorage.getItem('makercode',MAKER_CODE) ;
 
     // Reset states
@@ -244,6 +284,8 @@ async function init(pluginInterface) {
             const mac = regObj.mac;
             assert(ip == regObj.ip);
 
+            let bMacUpdated = false;
+
             try {
                 const seoj = els.SEOJ.substring(0, 4);
                 let epcList = EL.parseDetail(els.OPC, els.DETAIL);
@@ -259,6 +301,7 @@ async function init(pluginInterface) {
                         devices: {},
                         eoj_id_map: {},
                     };
+                    bMacUpdated = true;
                 } else {
                     /* macs[mac].active = true;
                     setIPAddressAsUnknown(macs[mac].ip);
@@ -268,6 +311,22 @@ async function init(pluginInterface) {
                 let mm = macs[mac];
 
                 // 機器が発見された
+
+                function registerExistingDevice(devid) {
+                    // let mac = getMacFromDeviceId(devid);
+                    // let ip = macsObj[mac].ip;
+                    let dev = macs[mac].devices[devid];
+
+                    if (dev.active === true) {
+                        log('Cannot register '+devid+' twice.');
+                        return;
+                    }
+                    dev.active = true;
+                    bMacUpdated = true;
+
+                    log(`Device ${devid}/${mac} registered.`);
+                }
+
                 function onDevFound(eoj) {
                     if (mm.eoj_id_map[eoj] != undefined) {
                         // Already defined device
@@ -280,7 +339,7 @@ async function init(pluginInterface) {
                             const dev = mm.devices[mm.eoj_id_map[eoj]];
                             if (!dev.active) {
                                 dev.active = true;
-                                savemac();
+                                bMacUpdated = true;
                             }
                         }
                     } else if (ELDB[eoj.slice(0, 4)] == undefined) {
@@ -310,12 +369,12 @@ async function init(pluginInterface) {
                         onDevFound(insts.slice(0, 6));
                         insts = insts.slice(6);
                     }
-                    savemac();
+                    bMacUpdated = true;
                 }
 
                 if (seoj != '0ef0') {
                     onDevFound(els.SEOJ);
-                    savemac();
+                    bMacUpdated = true;
                 } else if (els.DEOJ == '0ef001' && els.ESV == '73'
                            && els.DETAILs != undefined
                            && els.DETAILs.d5 != undefined) {
@@ -429,7 +488,9 @@ async function init(pluginInterface) {
                     }
                 }
 
-                savemac();
+                if (bMacUpdated) {
+                    savemac(mac);
+                }
             } catch (e) {
                 console.error('EL.renewFacilities error.');
                 console.dir(e);
@@ -573,21 +634,6 @@ function setPropVal(devid, epcHex, edtArray) {
             }
         }, GET_TIMEOUT);
     });
-}
-
-function registerExistingDevice(devid) {
-    let mac = getMacFromDeviceId(devid);
-    // let ip = macsObj[mac].ip;
-    let dev = macs[mac].devices[devid];
-
-    if (dev.active === true) {
-        log('Cannot register '+devid+' twice.');
-        return;
-    }
-    dev.active = true;
-    savemac();
-
-    log(`Device ${devid}/${mac} registered.`);
 }
 
 function parseEDTs(els) {

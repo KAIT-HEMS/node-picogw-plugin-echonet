@@ -244,7 +244,7 @@ async function init(pluginInterface) {
         for (const [objname, eoj] of Object.entries(data.elObjects)) {
             let objnamelc = objname.substring(2).toLowerCase();
             let minimizeObj = {
-                objectType: eoj.objectType,
+                objectType: eoj.objectType.toLowerCase(),
                 objectName: names[eoj.objectName],
                 epcs: {},
             };
@@ -256,7 +256,7 @@ async function init(pluginInterface) {
                     edtconvs = ProcConverter.eojs[objnamelc][epcid];
                 } catch (e) {}
                 minimizeObj.epcs[epcname.substring(2).toLowerCase()] = {
-                    epcType: epc.epcType,
+                    epcType: epc.epcType.toLowerCase(),
                     epcName: names[epc.epcName],
                     epcDoc: epc.doc,
                     edtConvFuncs: edtconvs,
@@ -454,8 +454,13 @@ async function init(pluginInterface) {
                             edt: edt,
                             value: (edtConvFunc && edtConvFunc(edt)),
                         };
+
+                        // for compatibility
                         pi.server.publish(
                             mm.eoj_id_map[els.SEOJ] + '/' + epcType,
+                            data);
+                        pi.server.publish(
+                            (mm.eoj_id_map[els.SEOJ] + '/' + epcType).toLowerCase(),
                             data);
                     }
                 }
@@ -744,7 +749,10 @@ function onProcCall(method, path /* _devid , propname*/, args) {
         }]}; // eslint-disable-line max-len
     }
     let devids = expandDeviceIdFromPossiblyRegExpDeviceId(
-        decodeURIComponent(_devid));
+        decodeURIComponent(_devid.toLowerCase()));
+    devids = devids.map((d)=>{
+        return d == _devid.toLowerCase() ? _devid : d;
+    });
     switch (method) {
     case 'GET':
     case 'DELETE':
@@ -820,9 +828,9 @@ function onProcCallGet(method, devid, propname, args) {
         return devices;
     }
 
-    const mac = getMacFromDeviceId(devid);
+    const mac = getMacFromDeviceId(devid.toLowerCase());
     if (mac == undefined) return {errors: [{message: 'No such device:'+devid}]};
-    const dev = macs[mac].devices[devid];
+    const dev = macs[mac].devices[devid.toLowerCase()];
     const eoj = dev.eoj.substring(0, 4);
     if (propname == '') { // access 'echonet/devid/' => property list
         // Ideally, property map should be checked.
@@ -875,9 +883,9 @@ function onProcCallGet(method, devid, propname, args) {
 
         let propMap = {};
         const mnames = [
-            'StateChangeAnnouncementPropertyMap',
-            'SetPropertyMap',
-            'GetPropertyMap',
+            'StateChangeAnnouncementPropertyMap'.toLowerCase(),
+            'SetPropertyMap'.toLowerCase(),
+            'GetPropertyMap'.toLowerCase(),
         ];
         mnames.forEach((mname)=>{
             if (dev[mname] && dev[mname].cache) {
@@ -948,7 +956,7 @@ function onProcCallGet(method, devid, propname, args) {
     const epcs = ELDB[eoj].epcs;
     let epcHex;
     for (const epc of Object.keys(epcs)) {
-        if (propname === epcs[epc].epcType) {
+        if (propname.toLowerCase() === epcs[epc].epcType) {
             epcHex = epc;
             break;
         }
@@ -961,7 +969,7 @@ function onProcCallGet(method, devid, propname, args) {
         } else return {errors: [{message: 'Unknown property name:'+propname}]};
     }
 
-    return getPropVal(devid, epcHex);
+    return getPropVal(devid.toLowerCase(), epcHex);
 }
 
 function onProcCallPut(method, devid, propname, args) {
@@ -973,15 +981,16 @@ function onProcCallPut(method, devid, propname, args) {
         }]}; // eslint-disable-line max-len
     }
 
-    let mac = getMacFromDeviceId(devid);
+    let mac = getMacFromDeviceId(devid.toLowerCase());
     if (mac == undefined) return {errors: [{message: 'No such device:'+devid}]};
 
     let epcHex = undefined;
     let edtConvFunc = undefined;
-    let eoj = macs[mac].devices[devid].eoj.slice(0, 4);
+    let eoj = macs[mac].devices[devid.toLowerCase()].eoj.slice(0, 4);
     let epcs = ELDB[eoj].epcs;
+    let propname_lower = propname.toLowerCase();
     for (const epc of Object.keys(epcs)) {
-        if (propname === epcs[epc].epcType) {
+        if (propname_lower === epcs[epc].epcType) {
             epcHex = epc;
             break;
         }
@@ -1015,7 +1024,7 @@ function onProcCallPut(method, devid, propname, args) {
         return {errors: [{message: 'No converter to generate edt from value.'}]};
     }
 
-    return setPropVal(devid, epcHex, args.edt);
+    return setPropVal(devid.toLowerCase(), epcHex, args.edt);
 }
 
 function onProcCallDelete(method, devid, propname, args) {

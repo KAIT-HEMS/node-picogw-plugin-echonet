@@ -766,7 +766,7 @@ function onProcCall(method, path /* _devid , propname*/, args) {
                         ac([devid, err]);
                     });
             }))).then((re)=>{
-                let res = {leaf: true};
+                let res = {};
                 re.forEach((_re)=>{
                     let key = `${RESPONSE_PREFIX}/${_re[0]}/${propname}`;
                     res[key]=_re[1];
@@ -815,8 +815,8 @@ function onProcCallGet(method, devid, propname, args) {
                     eoj: dev.eoj,
                 };
 
-                if (args.option === 'true') {
-                    devices[devid].option = {
+                if (args.info === 'true') {
+                    devices[devid]._info = {
                         doc: {
                             short: `EOJ:${dev.eoj} IP:${ip} MAC:${mac}`,
                         },
@@ -835,7 +835,7 @@ function onProcCallGet(method, devid, propname, args) {
     if (propname == '') { // access 'echonet/devid/' => property list
         // Ideally, property map should be checked.
         let names;
-        if (args.option === 'true') {
+        if (args.info === 'true') {
             const fname = 'all_' + LOCALE + '.json';
             names = JSON.parse(pi.pluginfs.readFileSync(fname, 'utf-8')).names;
         }
@@ -870,7 +870,7 @@ function onProcCallGet(method, devid, propname, args) {
                     cacheStr = '' ;
                     if( cacheValue != undefined ) cacheStr = ' Cache:'+cacheValue ;
                     else if( cacheEdt != undefined ) cacheStr = ' Cache:0x'+cacheEdt.map(i=>('0'+i.toString(16)).slice(-2)).join('') ;
-                    re[epcType].option = {
+                    re[epcType]._info = {
                         leaf : true
                         ,doc : {
                             short : `${epco.epcName} EPC:${epc}`+cacheStr
@@ -935,7 +935,7 @@ function onProcCallGet(method, devid, propname, args) {
                         .join('');
                     cacheStr = ' Cache:0x' + s;
                 }
-                re[epcType].option = {
+                re[epcType]._info = {
                     leaf: true,
                     doc: {
                         short: `${epco.epcName} EPC:${epc}`+cacheStr,
@@ -943,7 +943,7 @@ function onProcCallGet(method, devid, propname, args) {
                     },
                 };
                 if (epco.test instanceof Array) {
-                    re[epcType].option.test = epco.test;
+                    re[epcType]._info.test = epco.test;
                 }
             }
         }

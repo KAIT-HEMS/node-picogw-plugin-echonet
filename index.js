@@ -455,10 +455,6 @@ async function init(pluginInterface) {
                             value: (edtConvFunc && edtConvFunc(edt)),
                         };
 
-                        // for compatibility
-                        pi.server.publish(
-                            mm.eoj_id_map[els.SEOJ] + '/' + epcType,
-                            data);
                         pi.server.publish(
                             (mm.eoj_id_map[els.SEOJ] + '/' + epcType).toLowerCase(),
                             data);

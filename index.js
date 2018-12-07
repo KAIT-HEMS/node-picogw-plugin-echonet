@@ -578,7 +578,7 @@ function getPropVal(devid, epcHex) {
             return;
         }
 
-        const buffer = new Buffer([
+        const buffer = Buffer.from([
             0x10, 0x81,
             (tid>>8)&0xff, tid&0xff,
             MY_EOJ[0], MY_EOJ[1], MY_EOJ[2],
@@ -620,7 +620,7 @@ function setPropVal(devid, epcHex, edtArray) {
             return;
         }
 
-        const buffer = new Buffer([
+        const buffer = Buffer.from([
             0x10, 0x81,
             (tid>>8)&0xff, tid&0xff,
             MY_EOJ[0], MY_EOJ[1], MY_EOJ[2],
@@ -701,7 +701,7 @@ function sendFrame(ip, tid, seoj, deoj, esv, properties) {
     }
 
     let buffer;
-    buffer = new Buffer([
+    buffer = Buffer.from([
         0x10, 0x81,
         tid[0], tid[1],
         seoj[0], seoj[1], seoj[2],

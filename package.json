@@ -1,6 +1,6 @@
 {
   "name": "picogw-plugin-echonet",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "ECHONET plugin of picogw",
   "main": "index.js",
   "scripts": {
@@ -18,7 +18,7 @@
   },
   "homepage": "https://github.com/KAIT-HEMS/node-picogw-plugin-echonet#readme",
   "dependencies": {
-    "echonet-lite": "0.0.22"
+    "echonet-lite": "0.0.23"
   },
   "picogw": {
     "role": [

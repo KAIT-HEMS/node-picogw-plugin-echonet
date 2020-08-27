@@ -139,6 +139,15 @@ const msBackward = hmBackward;
 
 const hmsForward = (x) => `${x[0]}:${x[1]}:${x[2]}`;
 
+const signed2Byte = (h,l)=>{
+    let i = h*256+l;
+    return i>0x8000 ? i-0x10000 : i ;
+}
+const panelboardMeteringChVal = (x)=>[
+    toInt([x[0],x[1],x[2],x[3]]), // kWh
+    0.1*signed2Byte(x[4],x[5]),0.1*signed2Byte(x[6],x[7]), //0.1A
+]
+
 const NULLPROP=()=>undefined;
 
 const COMMUNICATION_ID = [
@@ -448,7 +457,51 @@ exports.eojs = {
 
 
     },
-
+    '0287': { // PanelboardMetering
+        'c0': [toInt],
+        'c1': [toInt],
+        'c5': [toInt, (x)=>[parseInt(x)]],
+        'c6': [(x)=>{
+            let i=toInt(x);
+            return i>0x80000000 ? i - 0x100000000 : i;
+        }],
+        'c7': [(x)=>[0.1*signed2Byte(x[0],x[1]) , 0.1*signed2Byte(x[2],x[3])]],
+        'c8': [(x)=>[0.1*toInt([x[0],x[1]]),0.1*toInt([x[2],x[3]])] ],
+        'd0': [panelboardMeteringChVal],
+        'd1': [panelboardMeteringChVal],
+        'd2': [panelboardMeteringChVal],
+        'd3': [panelboardMeteringChVal],
+        'd4': [panelboardMeteringChVal],
+        'd5': [panelboardMeteringChVal],
+        'd6': [panelboardMeteringChVal],
+        'd7': [panelboardMeteringChVal],
+        'd8': [panelboardMeteringChVal],
+        'd9': [panelboardMeteringChVal],
+        'da': [panelboardMeteringChVal],
+        'db': [panelboardMeteringChVal],
+        'dc': [panelboardMeteringChVal],
+        'dd': [panelboardMeteringChVal],
+        'de': [panelboardMeteringChVal],
+        'df': [panelboardMeteringChVal],
+        'e0': [panelboardMeteringChVal],
+        'e1': [panelboardMeteringChVal],
+        'e2': [panelboardMeteringChVal],
+        'e3': [panelboardMeteringChVal],
+        'e4': [panelboardMeteringChVal],
+        'e5': [panelboardMeteringChVal],
+        'e6': [panelboardMeteringChVal],
+        'e7': [panelboardMeteringChVal],
+        'e8': [panelboardMeteringChVal],
+        'e9': [panelboardMeteringChVal],
+        'ea': [panelboardMeteringChVal],
+        'eb': [panelboardMeteringChVal],
+        'ec': [panelboardMeteringChVal],
+        'ed': [panelboardMeteringChVal],
+        'ee': [panelboardMeteringChVal],
+        'ef': [panelboardMeteringChVal],
+        'b0': [toInt],
+        'b1': [toInt],
+    },
     '0288': { // Smart meter
         'd7': [toInt],
         'e0': [toInt],

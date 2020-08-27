@@ -20099,16 +20099,16 @@
 					]
 				},
 				"0xC0": {
-					"epcType": "IntegralPowerConsumptionMeasurementValue",
-					"epcName": "$EPCNAME_INTEGRAL_POWER_CONSUMPTION_MEASUREMENT_VALUE",
+					"epcType": "ForwardIntegralPowerConsumptionMeasurementValue",
+					"epcName": "$EPCNAME_FORWARD_INTEGRAL_POWER_CONSUMPTION_MEASUREMENT_VALUE",
 					"epcSize": 4,
 					"accessModeAnno": "notApplicable",
 					"accessModeGet": "required",
 					"accessModeSet": "notApplicable",
 					"edt": [
 						{
-							"elementType": "IntegralPowerConsumptionMeasurementValue",
-							"elementName": "$ELEMNAME_INTEGRAL_POWER_CONSUMPTION_MEASUREMENT_VALUE",
+							"elementType": "ForwardIntegralPowerConsumptionMeasurementValue",
+							"elementName": "$ELEMNAME_FORWARD_INTEGRAL_POWER_CONSUMPTION_MEASUREMENT_VALUE",
 							"elementSize": 4,
 							"repeatCount": 1,
 							"content": {
@@ -20126,16 +20126,16 @@
 					]
 				},
 				"0xC1": {
-					"epcType": "IntegralPowerConsumptionMeasurementValue",
-					"epcName": "$EPCNAME_INTEGRAL_POWER_CONSUMPTION_MEASUREMENT_VALUE",
+					"epcType": "ReverseIntegralPowerConsumptionMeasurementValue",
+					"epcName": "$EPCNAME_REVERSE_INTEGRAL_POWER_CONSUMPTION_MEASUREMENT_VALUE",
 					"epcSize": 4,
 					"accessModeAnno": "notApplicable",
 					"accessModeGet": "required",
 					"accessModeSet": "notApplicable",
 					"edt": [
 						{
-							"elementType": "IntegralPowerConsumptionMeasurementValue",
-							"elementName": "$ELEMNAME_INTEGRAL_POWER_CONSUMPTION_MEASUREMENT_VALUE",
+							"elementType": "ReverseIntegralPowerConsumptionMeasurementValue",
+							"elementName": "$ELEMNAME_REVERSE_INTEGRAL_POWER_CONSUMPTION_MEASUREMENT_VALUE",
 							"elementSize": 4,
 							"repeatCount": 1,
 							"content": {
@@ -20182,16 +20182,16 @@
 					]
 				},
 				"0xC3": {
-					"epcType": "IntegralPowerConsumptionMeasurementValueHistory",
-					"epcName": "$EPCNAME_INTEGRAL_POWER_CONSUMPTION_MEASUREMENT_VALUE_HISTORY",
+					"epcType": "ForwardIntegralPowerConsumptionMeasurementValueHistory",
+					"epcName": "$EPCNAME_FORWARD_INTEGRAL_POWER_CONSUMPTION_MEASUREMENT_VALUE_HISTORY",
 					"epcSize": 194,
 					"accessModeAnno": "notApplicable",
 					"accessModeGet": "optional",
 					"accessModeSet": "notApplicable",
 					"edt": [
 						{
-							"elementType": "IntegralPowerConsumptionMeasurementValueHistory",
-							"elementName": "$ELEMNAME_INTEGRAL_POWER_CONSUMPTION_MEASUREMENT_VALUE_HISTORY",
+							"elementType": "ForwardIntegralPowerConsumptionMeasurementValueHistory",
+							"elementName": "$ELEMNAME_FORWARD_INTEGRAL_POWER_CONSUMPTION_MEASUREMENT_VALUE_HISTORY",
 							"elementSize": 2,
 							"repeatCount": 1,
 							"content": {
@@ -20226,16 +20226,16 @@
 					]
 				},
 				"0xC4": {
-					"epcType": "IntegralPowerConsumptionMeasurementValueHistory",
-					"epcName": "$EPCNAME_INTEGRAL_POWER_CONSUMPTION_MEASUREMENT_VALUE_HISTORY",
+					"epcType": "ReverseIntegralPowerConsumptionMeasurementValueHistory",
+					"epcName": "$EPCNAME_REVERSE_INTEGRAL_POWER_CONSUMPTION_MEASUREMENT_VALUE_HISTORY",
 					"epcSize": 194,
 					"accessModeAnno": "notApplicable",
 					"accessModeGet": "optional",
 					"accessModeSet": "notApplicable",
 					"edt": [
 						{
-							"elementType": "IntegralPowerConsumptionMeasurementValueHistory",
-							"elementName": "$ELEMNAME_INTEGRAL_POWER_CONSUMPTION_MEASUREMENT_VALUE_HISTORY",
+							"elementType": "ReverseIntegralPowerConsumptionMeasurementValueHistory",
+							"elementName": "$ELEMNAME_REVERSE_INTEGRAL_POWER_CONSUMPTION_MEASUREMENT_VALUE_HISTORY",
 							"elementSize": 2,
 							"repeatCount": 1,
 							"content": {

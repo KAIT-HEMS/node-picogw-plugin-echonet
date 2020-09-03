@@ -149,15 +149,15 @@ const panelboardMeteringChVal = (x)=>[
 ]
 
 const panelboardHistory = function(x){
-    if( x.length != 194) return [-1];
-    let ret = [
-        toInt([x[0],x[1]])
-        ,[]
-    ];
+    if( x.length != 194) return {errors:[{error:'Unknown format'}]};
+    let ret = {
+        day:toInt([x[0],x[1]])
+        ,history:[]
+    };
 
     let ii = 2;
     for( let i=0;i<48;++i,ii+=4 ){
-        ret[1].push(
+        ret.history.push(
             toInt([x[ii],x[ii+1],x[ii+2],x[ii+3]])
         );
     }

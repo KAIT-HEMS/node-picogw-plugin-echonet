@@ -148,6 +148,22 @@ const panelboardMeteringChVal = (x)=>[
     0.1*signed2Byte(x[4],x[5]),0.1*signed2Byte(x[6],x[7]), //0.1A
 ]
 
+const panelboardHistory = function(x){
+    if( x.length != 194) return [-1];
+    let ret = [
+        toInt([x[0],x[1]])
+        ,[]
+    ];
+
+    let ii = 2;
+    for( let i=0;i<48;++i,ii+=4 ){
+        ret[1].push(
+            toInt([x[ii],x[ii+1],x[ii+2],x[ii+3]])
+        );
+    }
+    return ret;
+}
+
 const NULLPROP=()=>undefined;
 
 const COMMUNICATION_ID = [
@@ -460,6 +476,8 @@ exports.eojs = {
     '0287': { // PanelboardMetering
         'c0': [toInt],
         'c1': [toInt],
+        'c3': [panelboardHistory],
+        'c4': [panelboardHistory],
         'c5': [toInt, (x)=>[parseInt(x)]],
         'c6': [(x)=>{
             let i=toInt(x);

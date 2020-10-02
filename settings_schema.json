@@ -8,6 +8,14 @@
 			,"enum": []
 			,"required": true
 		}
+		,"IPv4_v6":{
+			"title": "IPv4/v6"
+			,"description":"IPv6 is necessary to access smart meters."
+			,"type": "string"
+			,"enum": ["IPv4","IPv6","IPv4 and IPv6"]
+			,"default": "IPv4"
+			,"required": true
+		}
 		,"root_passwd": {
 			"title": "Sudo password"
 			,"description": "Necessary to change network setup"

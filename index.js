@@ -287,8 +287,7 @@ async function init(pluginInterface) {
     // Replace the original function
     // ネットワーク内のEL機器全体情報を更新する，受信したら勝手に実行される
     EL.renewFacilities = function(ip, els) {
-        // log(`ECHONET packet recv from ${ip}`);
-        //        pi.getMACFromIPv4Address(mynet, ip, true).then((mac)=>{
+        // pi.getMACFromIPv4Address(mynet, ip, true).then((mac)=>{
         pi.net.registerIP(ip).then((regObj)=>{
             const mac = regObj.mac;
             assert(ip == regObj.ip);
@@ -428,7 +427,7 @@ async function init(pluginInterface) {
                                 edtConvFunc = epco.edtConvFuncs[0];
                             }
                         }
-                        // }
+
 
                         if (epcType == undefined) epcType = _epc;
                         //if (epcList[_epc]=='') return true; // Meaning continue loop
@@ -436,7 +435,7 @@ async function init(pluginInterface) {
                         // epcType : human readable epc name.
                         // If such name is unavailable, it is just the edt hex
                         if( sender[epcType] == null ) // No property is defined yet
-                            sender[epcType] = {cache: edt, timestamp: Date.now()};
+                            sender[epcType] = { /*cache: edt,*/ timestamp: Date.now()};
                         else
                             sender[epcType].timestamp = Date.now();
 
@@ -462,16 +461,14 @@ async function init(pluginInterface) {
                             case '9f': // get property map
                                 if( els.DETAILs[epc] == null ) break;
                                 let epcs = EL.toHexArray( els.DETAILs[epc] );
-                                if( epcs.length >= 17 )
-                                    epcs = EL.parseMapForm2( els.DETAILs[epc] );
-                                
                                 if( epcs.length != epcs[0]+1 ){
                                     log(`Illegally formatted property map:${ip}(${mac}):${epc}`);
                                     break;
                                 }
+                                //log('Property map on '+seoj);
                                 epcs.shift();
                                 epcs.forEach(pEPC=>{ // EPC in the property map
-                                    setEPC(pEPC,false);
+                                    setEPC(pEPC.toString(16),false);
                                 });
                         }
                     }
@@ -559,6 +556,7 @@ async function init(pluginInterface) {
     };
 
     function onReceiveGetRequest(ip, els) {
+
         try {
             let esv = EL.GET_RES;
             const props = parseEDTs(els);
@@ -579,6 +577,15 @@ async function init(pluginInterface) {
         }
     }
 
+    let ipver=4;
+    if( pi.setting.getSettings() != null ){
+        switch(pi.setting.getSettings().IPv4_v6){
+            case 'IPv4' : ipver = 4; break ;
+            case 'IPv6' : ipver = 6; break ;
+            case 'IPv4 and IPv6' : ipver = 0; break ;
+        }
+    }
+
     const eojList = [MY_EOJ.map((e)=>('0'+e.toString(16)).slice(-2)).join('')];
     EL.initialize(eojList, (rinfo, els, err) => {
         if (err) {
@@ -589,7 +596,8 @@ async function init(pluginInterface) {
                 onReceiveGetRequest(rinfo.address, els);
             }
         }
-    },ipVer = 4, Options = {ignoreMe: true, autoGetProperties:false});
+    },ipver, Options = {ignoreMe: true, autoGetProperties:false});
+    //},ipVer = 4, Options = {ignoreMe: true, autoGetProperties:false});
 
     function searcher() {
         EL.search();
@@ -934,9 +942,6 @@ function onProcCallGet(method, devid, propname, args) {
         mnames.forEach((mname)=>{
             if (dev[mname] && dev[mname].cache) {
                 let c = dev[mname].cache;
-                if (c[0] >= 16) {
-                    c = EL.parseMapForm2(EL.bytesToString(c));
-                }
                 c.slice(1, 1+c[0]).forEach((epcd)=>{
                     propMap[epcd.toString(16)] = null;
                 });
@@ -1190,6 +1195,13 @@ or
 };
 
 async function onUISetSettings(newSettings) {
+    log(newSettings);
+    if(pi.setting.getSettings() == null
+    || pi.setting.getSettings().IPv4_v6 != newSettings.IPv4_v6){
+        log(`\u001b[31mECHONET IPver is set to ${newSettings.IPv4_v6}. Please reboot!\u001b[0m`);
+        return {"IPv4_v6":newSettings.IPv4_v6};
+    }
+
     await setNetwork(newSettings.net, newSettings.root_passwd);
     return null; // save nothing
 };

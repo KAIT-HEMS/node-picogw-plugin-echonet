@@ -1,32 +1,57 @@
 {
-  "name": "picogw-plugin-echonet",
-  "version": "1.0.9",
-  "description": "ECHONET plugin of picogw",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "lint": "eslint ."
+  "_from": "picogw-plugin-echonet@1.0.9",
+  "_id": "picogw-plugin-echonet@1.0.9",
+  "_inBundle": false,
+  "_integrity": "sha512-9fZCXFGOFdQ8Mexo0CNOsUXMu8y6P2pRRClN0nTXtHg9QkTPAOaeydohM5lFyZdHZh5y3WVecMhEJgW+/F/+Ig==",
+  "_location": "/picogw/picogw-plugin-echonet",
+  "_phantomChildren": {},
+  "_requested": {
+    "type": "version",
+    "registry": true,
+    "raw": "picogw-plugin-echonet@1.0.9",
+    "name": "picogw-plugin-echonet",
+    "escapedName": "picogw-plugin-echonet",
+    "rawSpec": "1.0.9",
+    "saveSpec": null,
+    "fetchSpec": "1.0.9"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/KAIT-HEMS/node-picogw-plugin-echonet.git"
-  },
+  "_requiredBy": [
+    "/picogw"
+  ],
+  "_resolved": "https://registry.npmjs.org/picogw-plugin-echonet/-/picogw-plugin-echonet-1.0.9.tgz",
+  "_shasum": "2e66524acd2307d4d0f9f97563e81fd9c908b8cd",
+  "_spec": "picogw-plugin-echonet@1.0.9",
+  "_where": "/home/sowd/.nvm/versions/node/v9.5.0/lib/node_modules/picogw",
   "author": "",
-  "license": "MIT",
   "bugs": {
     "url": "https://github.com/KAIT-HEMS/node-picogw-plugin-echonet/issues"
   },
-  "homepage": "https://github.com/KAIT-HEMS/node-picogw-plugin-echonet#readme",
+  "bundleDependencies": false,
   "dependencies": {
     "echonet-lite": "^2.2.2"
   },
+  "deprecated": false,
+  "description": "ECHONET plugin of picogw",
+  "devDependencies": {
+    "eslint": "^4.13.1",
+    "eslint-config-google": "^0.9.1"
+  },
+  "homepage": "https://github.com/KAIT-HEMS/node-picogw-plugin-echonet#readme",
+  "license": "MIT",
+  "main": "index.js",
+  "name": "picogw-plugin-echonet",
   "picogw": {
     "role": [
       "server"
     ]
   },
-  "devDependencies": {
-    "eslint": "^4.13.1",
-    "eslint-config-google": "^0.9.1"
-  }
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KAIT-HEMS/node-picogw-plugin-echonet.git"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "version": "1.0.10"
 }

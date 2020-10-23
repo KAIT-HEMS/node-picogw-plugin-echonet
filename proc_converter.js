@@ -103,7 +103,6 @@ const arrayFromAsciiStr = (x, len)=>{
     return re;
 };
 
-
 const toInt = (array) =>{
     let ret = 0;
     Array.prototype.forEach.call(array, (a)=>{
@@ -111,6 +110,17 @@ const toInt = (array) =>{
     });
     return ret;
 };
+
+const toSignedInt4 = (x)=>{
+    let i=toInt(x);
+    return i>0x80000000 ? i - 0x100000000 : i;
+};
+
+const signed2Byte = (h,l)=>{
+    let i = h*256+l;
+    return i>0x8000 ? i-0x10000 : i ;
+}
+
 const intToArray = (val, arraySize) =>{
     let re=[];
     let i;
@@ -139,12 +149,24 @@ const msBackward = hmBackward;
 
 const hmsForward = (x) => `${x[0]}:${x[1]}:${x[2]}`;
 
-const signed2Byte = (h,l)=>{
-    let i = h*256+l;
-    return i>0x8000 ? i-0x10000 : i ;
+
+const dayAndHistory48 = (x)=> {
+    let re = {day: toInt(x.slice(0, 2)), value: []};
+    let pos = 2;
+    for (let i=0; i<48; ++i,pos+=4) {
+        re.value.push(toInt(x.slice(pos, pos+4)));
+    }
+    return re;
 }
+const powerUnit0toD = (x)=>{
+    let i=toInt(x); return i<5?Math.pow(10, -i):Math.pow(10, i-0xa+1);
+};
+// For high vol smart meter
+const ymd4_hms3_number = (x) => [yymdForward(x), hmsForward(x.slice(4, 7)), toInt(x.slice(7))];
+
+
 const panelboardMeteringChVal = (x)=>[
-    toInt([x[0],x[1],x[2],x[3]]), // kWh
+    toInt(x.slice(0,4)), // kWh
     0.1*signed2Byte(x[4],x[5]),0.1*signed2Byte(x[6],x[7]), //0.1A
 ]
 
@@ -158,7 +180,7 @@ const panelboardHistory = function(x){
     let ii = 2;
     for( let i=0;i<48;++i,ii+=4 ){
         ret.history.push(
-            toInt([x[ii],x[ii+1],x[ii+2],x[ii+3]])
+            toInt(x.slice(ii,ii+4))
         );
     }
     return ret;
@@ -440,7 +462,6 @@ exports.eojs = {
         'ef': [toInt],
     },
 
-
     '0272': { // Instantaneous water heter (Ecocute)
         'd0': [(x)=>enumForward(x, ON_OFF_41)],
         'd1': [(x)=>x[0], (x)=>[parseInt(x)]],
@@ -476,13 +497,11 @@ exports.eojs = {
     '0287': { // PanelboardMetering
         'c0': [toInt],
         'c1': [toInt],
+        'c2': [powerUnit0toD],
         'c3': [panelboardHistory],
         'c4': [panelboardHistory],
         'c5': [toInt, (x)=>[parseInt(x)]],
-        'c6': [(x)=>{
-            let i=toInt(x);
-            return i>0x80000000 ? i - 0x100000000 : i;
-        }],
+        'c6': [toSignedInt4],
         'c7': [(x)=>[0.1*signed2Byte(x[0],x[1]) , 0.1*signed2Byte(x[2],x[3])]],
         'c8': [(x)=>[0.1*toInt([x[0],x[1]]),0.1*toInt([x[2],x[3]])] ],
         'd0': [panelboardMeteringChVal],
@@ -523,34 +542,45 @@ exports.eojs = {
     '0288': { // Smart meter
         'd7': [toInt],
         'e0': [toInt],
-        'e1': [(x)=>{
-            let i=toInt(x); return i<5?Math.pow(10, -i):Math.pow(10, i);
-        }],
-        'e2': [(x)=> {
-            let re = {day: toInt(x.slice(0, 2)), value: []};
-            for (let i=0; i<48; ++i) {
-                re.value.push(toInt(x.slice(2+i*4), 4));
-            }
-            return re;
-        }],
+        'e1': [powerUnit0toD],
+        'e2': [dayAndHistory48],
         'e3': [toInt],
-        'e4': [(x)=> {
-            let re = {day: toInt(x.slice(0, 2)), value: []};
-            for (let i=0; i<48; ++i) {
-                re.value.push(toInt(x.slice(2+i*4), 4));
-            }
-            return re;
-        }],
+        'e4': [dayAndHistory48],
         'e5': [toInt, (x)=>[parseInt(x)]],
         'e7': [toInt],
         'e8': [(x)=>[x.slice(0, 2), x.slice(2, 4)].map((ar)=>{
             let i = toInt(ar);
             return i<0x8000 ? i*0.1 : -(0x10000-i)*0.1;
         })],
-        'ea': [(x)=>[yymdForward(x), hmsForward(x.slice(4, 7)),
-            toInt(x.slice(7))]],
-        'eb': [(x)=>[yymdForward(x), hmsForward(x.slice(4, 7)),
-            toInt(x.slice(7))]],
+        'ea': [ymd4_hms3_number],
+        'eb': [ymd4_hms3_number],
+    },
+    '028a': { // High voltage smart meter
+        'd3': [toInt],
+        'd4': [(x)=>{
+            let i=toInt(x); return Math.pow(10, -i);
+        }],
+        'e0': [toInt],
+        'e1': [toInt, (x)=>[parseInt(x)]],
+        'e2': [ymd4_hms3_number],
+        'e3': [ymd4_hms3_number],
+        'e4': [ymd4_hms3_number],
+        'e5': [toInt],
+        'e6': [powerUnit0toD],
+        'e7': [dayAndHistory48],
+
+        'c1': [toInt],
+        'c2': [toInt],
+        'c3': [ymd4_hms3_number],
+        'c4': [toInt],
+        'c5': [powerUnit0toD],
+        'c6': [dayAndHistory48],
+        'c7': [powerUnit0toD],
+        'ca': [ymd4_hms3_number],
+        'cb': [ymd4_hms3_number],
+        'cc': [toInt],
+        'cd': [powerUnit0toD],
+        'ce': [dayAndHistory48],
     },
 
     '0290': { // Generic light

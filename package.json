@@ -33,7 +33,7 @@
   "deprecated": false,
   "description": "ECHONET plugin of picogw",
   "devDependencies": {
-    "eslint": "^4.13.1",
+    "eslint": "^8.31.0",
     "eslint-config-google": "^0.9.1"
   },
   "homepage": "https://github.com/KAIT-HEMS/node-picogw-plugin-echonet#readme",

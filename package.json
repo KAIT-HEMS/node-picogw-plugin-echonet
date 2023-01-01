@@ -26,9 +26,9 @@
   "bugs": {
     "url": "https://github.com/KAIT-HEMS/node-picogw-plugin-echonet/issues"
   },
-  "bundleDependencies": false,
+  "bundleDependencies": [],
   "dependencies": {
-    "echonet-lite": "^2.2.2"
+    "echonet-lite": "^2.14.2"
   },
   "deprecated": false,
   "description": "ECHONET plugin of picogw",
@@ -53,5 +53,5 @@
     "lint": "eslint .",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "version": "1.0.11"
+  "version": "1.0.12"
 }
